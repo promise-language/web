@@ -63,7 +63,7 @@ main() {
 Build for the browser and load the glue from the page:
 
 ```bash
-promise build --target wasm32-web main.pr    # -> main.wasm
+promise build -target wasm32-web main.pr    # -> main.wasm
 ```
 
 ```html
@@ -73,8 +73,13 @@ promise build --target wasm32-web main.pr    # -> main.wasm
 </script>
 ```
 
-Handles are owned: each wrapper releases its handle when it drops, so never
-construct a second wrapper over a handle another wrapper already holds.
+Two things to keep in mind:
+
+- **Handles are owned.** Each wrapper releases its handle when it drops, so
+  never construct a second wrapper over a handle another wrapper already holds.
+- **Don't name the consuming project `web`.** Every `wasm32-web` build emits a
+  bootstrap loader named after its output, so a project named `web` writes a
+  `web.js` that overwrites this module's glue of the same name.
 
 ## Provenance
 
