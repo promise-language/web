@@ -1,0 +1,29 @@
+web — Web platform (browser) bindings for the Promise programming language
+
+Copyright (c) 2026 The Promise Authors
+
+This module is part of the Promise Lang project, hosted in the `promise-language`
+organization and maintained under Promise Lang LLC. It is dual-licensed under
+the Apache License, Version 2.0, and the MIT License; see LICENSE-APACHE and
+LICENSE-MIT.
+
+-------------------------------------------------------------------------------
+Third-party attribution
+-------------------------------------------------------------------------------
+
+The bindings in this module are typed to the Web platform interface definitions
+(WebIDL) published by the WHATWG and the W3C:
+
+    https://whatwg.org
+    https://www.w3.org
+
+The interfaces covered include those defined by the WHATWG DOM, HTML, Fetch, and
+URL Living Standards, and by W3C specifications such as CSSOM and the Web IDL
+standard itself. WHATWG Living Standards are licensed under the Creative Commons
+Attribution 4.0 International License (CC BY 4.0); W3C specifications are
+published under the W3C Software and Document License.
+
+This module reproduces interface names, member names, and type shapes from those
+specifications for interoperability; the binding code itself is original work by
+The Promise Authors. Trademarks and project names remain the property of their
+respective owners.
