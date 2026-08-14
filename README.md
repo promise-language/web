@@ -3,17 +3,31 @@
 Web platform (browser) bindings for the
 [Promise programming language](https://github.com/promise-language/promise).
 
-This module provides typed bindings to the Web platform APIs — DOM, events,
-console, timers, fetch, and the `JsValue` dynamic-value bridge — for
-`` `target(web) `` builds targeting `wasm32-web`.
+This module provides typed bindings to the DOM for `wasm32-web` builds. The
+bindings are generated from WebIDL by `promise bind webidl`, which emits two
+files: the Promise module (`web.pr`) and the JavaScript glue (`web.js`) that the
+page loads to instantiate the module and implement its `promise_env` imports.
 
-The bindings are generated from the upstream WebIDL definitions via
-`promise bind webidl` and then polished with inline `` `doc `` annotations.
+Each generated interface becomes a `` `target(web) `` type wrapping an opaque
+`i32` handle into the glue's JS object table, with WebIDL attributes exposed as
+`get`/`set` properties and operations as methods:
 
-> **Status:** repository scaffolding only. The generated binding sources are not
-> in place yet; see [docs/wasm-bindings.md](https://github.com/promise-language/promise/blob/main/docs/wasm-bindings.md)
-> in the compiler repository for the binding architecture and the planned module
-> surface.
+```promise
+type Document `public `target(web) {
+    i32 _handle;
+
+    get title string `public { ... }
+    create_element(this, string local_name) Element `public { ... }
+}
+```
+
+> **Status:** repository scaffolding only — the generated bindings are not in
+> place yet. A hello-world does run in Chrome today, but only from a
+> hand-trimmed IDL subset and with a post-processing pass over the generated
+> glue: the WebIDL path emits canonical-ABI JS while the compiler lowers WebIDL
+> externs the Promise-native way, and the generator does not yet handle
+> interface inheritance or overloaded operations. Those are compiler-side fixes;
+> this repository will carry the bindings once they generate cleanly.
 
 ## Usage
 
@@ -22,13 +36,45 @@ Registered in the Promise module catalog under the name **`web`**:
 ```promise
 use web;
 
-main() `target(web) {
-    doc := document();
-    element := doc.create_element("div");
-    element.set_inner_text("Hello from Promise!");
-    doc.body().append_child(move element);
+main() {
+    // The glue seeds handles before calling _initialize: 1 = globalThis,
+    // 2 = document, 3 = console. Generated bindings have no way to name a JS
+    // global, so the roots are constructed from their handles.
+    doc := web.Document(_handle: 2);
+    console := web.Console(_handle: 3);
+
+    console.log("hello from Promise, running as WebAssembly");
+
+    page := doc.body ? {
+        console.log("no document.body — nothing to do");
+        return;
+    };
+
+    heading := doc.create_element("h1");
+    heading.text_content = "hello world";
+    heading.id = "greeting";
+
+    page.append_child(heading);
+
+    console.log("document.title is: {doc.title}");
 }
 ```
+
+Build for the browser and load the glue from the page:
+
+```bash
+promise build --target wasm32-web main.pr    # -> main.wasm
+```
+
+```html
+<script type="module">
+  import { init } from "./web.js";
+  await init("main.wasm");
+</script>
+```
+
+Handles are owned: each wrapper releases its handle when it drops, so never
+construct a second wrapper over a handle another wrapper already holds.
 
 ## Provenance
 

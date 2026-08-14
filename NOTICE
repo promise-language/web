@@ -17,11 +17,10 @@ The bindings in this module are typed to the Web platform interface definitions
     https://whatwg.org
     https://www.w3.org
 
-The interfaces covered include those defined by the WHATWG DOM, HTML, Fetch, and
-URL Living Standards, and by W3C specifications such as CSSOM and the Web IDL
-standard itself. WHATWG Living Standards are licensed under the Creative Commons
-Attribution 4.0 International License (CC BY 4.0); W3C specifications are
-published under the W3C Software and Document License.
+The interfaces covered are those defined by the WHATWG DOM Living Standard and
+related Web platform specifications. WHATWG Living Standards are licensed under
+the Creative Commons Attribution 4.0 International License (CC BY 4.0); W3C
+specifications are published under the W3C Software and Document License.
 
 This module reproduces interface names, member names, and type shapes from those
 specifications for interoperability; the binding code itself is original work by
