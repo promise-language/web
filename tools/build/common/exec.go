@@ -37,3 +37,12 @@ func OutputBytesIn(dir, name string, args ...string) ([]byte, error) {
 func RunSilent(name string, args ...string) error {
 	return exec.Command(name, args...).Run()
 }
+
+// RunSilentIn runs name+args in dir with output discarded, returning only
+// whether it succeeded. Use it for commands run for their effect, where the
+// output would be noise — RunIn would forward it to the parent's terminal.
+func RunSilentIn(dir, name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	return cmd.Run()
+}
