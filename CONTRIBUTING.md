@@ -27,10 +27,35 @@ core, LLC-covered code: contributions must **not** introduce code under a
 copyleft license (GPL, LGPL, AGPL, EUPL, or similar) or code of uncertain
 provenance.
 
+## Development setup
+
+Dev tools are compiled from the in-repo Go module in `tools/build/` into `bin/`,
+which is gitignored. Bootstrap once per clone:
+
+```bash
+./make          # Windows: .\make.cmd
+```
+
+You need the Go toolchain and the [Promise
+compiler](https://github.com/promise-language/promise). Everything is Go — there
+are no shell scripts to keep in sync across platforms.
+
+| Command | What it does |
+|---|---|
+| `./make` | compiles every tool under `tools/build/cmd/` into `bin/` |
+| `bin/bindgen` | fetches the pinned WebIDL and regenerates `web.pr` + `web.js` |
+| `bin/fetch-idl` | materializes `idl/` on its own, to read the WebIDL (`-list` to just print the pin) |
+| `bin/verify` | the commit gate — run it before every commit |
+
 ## How to contribute
 
 1. Open an issue describing the change before large work, where practical.
 2. Keep the binding surface faithful to the upstream WebIDL definitions
    published by the WHATWG and W3C (see [NOTICE](NOTICE) for provenance).
-3. Run the `*_test.pr` test files and add coverage for new surface.
-4. Open a pull request and sign the CLA when prompted.
+3. **Do not hand-edit `web.pr` or `web.js`** — they are generated, and the next
+   `bin/bindgen` discards any edit. Change the spec list or the pinned webref
+   revision in `tools/build/common/webref.go`, or fix the generator in the
+   compiler repo, then regenerate.
+4. Run the `*_test.pr` test files and add coverage for new surface.
+5. Run `bin/verify` and make sure it prints "OK to Commit".
+6. Open a pull request and sign the CLA when prompted.

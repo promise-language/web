@@ -29,6 +29,50 @@ type Document `public `target(web) {
 > interface inheritance or overloaded operations. Those are compiler-side fixes;
 > this repository will carry the bindings once they generate cleanly.
 
+## Coverage
+
+The binding surface is generated from these W3C/WHATWG specifications, taken
+from the [webref](https://github.com/w3c/webref) curated extraction:
+
+| Spec | Contributes |
+|---|---|
+| WHATWG DOM | `EventTarget`, `Node`, `Element`, `Document`, `Range` |
+| WHATWG HTML | `Window`, `HTMLElement` and the element hierarchy |
+| WHATWG Console | the `console` namespace |
+| UI Events | `UIEvent`, `MouseEvent`, `KeyboardEvent` |
+| CSSOM | `CSSStyleDeclaration`, `CSSRule`, `StyleSheet` |
+| CSSOM View | `getBoundingClientRect`, scrolling, `DOMRect` on elements |
+| Geometry Interfaces | `DOMPoint`, `DOMRect`, `DOMMatrix` |
+| WHATWG URL | `URL`, `URLSearchParams` |
+| XMLHttpRequest | `XMLHttpRequest`, `FormData`, `ProgressEvent` |
+
+The exact list and the pinned webref revision live in
+[`tools/build/common/webref.go`](tools/build/common/webref.go).
+
+## Regenerating the bindings
+
+`web.pr` and `web.js` are generated and committed; the WebIDL they are generated
+*from* is not — it is fetched on demand into a gitignored `idl/`, so no
+third-party spec text lives in this tree.
+
+```bash
+./make            # Windows: .\make.cmd  — compiles the dev tools into bin/
+bin/bindgen       # fetch the pinned WebIDL, regenerate web.pr and web.js
+bin/verify        # the commit gate
+```
+
+To read the WebIDL itself — there is no copy in the tree — materialize it
+separately, or print the pin without fetching anything:
+
+```bash
+bin/fetch-idl        # write idl/ at the pinned version
+bin/fetch-idl -list  # print the pinned release and the spec list
+```
+
+`bin/bindgen` pins `@webref/idl` by version *and* tarball sha256 and refuses to
+run on a mismatch, so a binding diff can always be traced to a spec revision.
+Never hand-edit `web.pr` or `web.js` — fix the generator or the spec list.
+
 ## Usage
 
 Registered in the Promise module catalog under the name **`web`**:
