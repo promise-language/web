@@ -46,6 +46,12 @@ are no shell scripts to keep in sync across platforms.
 | `bin/bindgen` | fetches the pinned WebIDL and regenerates `web.pr` + `web.js` |
 | `bin/fetch-idl` | materializes `idl/` on its own, to read the WebIDL (`-list` to just print the pin) |
 | `bin/verify` | the commit gate — run it before every commit |
+| `bin/gate --list` / `bin/run <gate>` | list the measurements, or measure and judge one |
+
+The repository is workspace-managed (`workspace.toml`): the committed git hooks
+and agent guard call `bin/precommit-guard`, `bin/prepush-guard` and
+`bin/tool-guard`, which `workspace setup` installs rather than `./make`. Until a
+clone is provisioned with it, the pre-commit hook refuses every commit.
 
 ## How to contribute
 

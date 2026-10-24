@@ -1,0 +1,5 @@
+# This project conforms completely to workspace policy and is treated
+# generically. Where its items come from:
+orchestrator = "github"
+# The oldest workspace release this project accepts:
+minimum-release = "v0.28.0"

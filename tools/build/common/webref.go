@@ -104,12 +104,15 @@ func IDLFresh(repoRoot string) bool {
 //
 // This is the one path to a populated idl/: bin/fetch-idl calls it directly,
 // and bin/bindgen calls it before handing the files to `promise bind webidl`.
-func EnsureIDL(repoRoot string, force bool) error {
+//
+// Progress goes to narrate, never to stdout: stdout is the calling command's
+// result.
+func EnsureIDL(repoRoot string, force bool, narrate io.Writer) error {
 	if !force && IDLFresh(repoRoot) {
-		fmt.Printf("    %s/ is already at @webref/idl@%s (-force to re-fetch)\n", IDLDir, WebrefVersion)
+		fmt.Fprintf(narrate, "    %s/ is already at @webref/idl@%s (-force to re-fetch)\n", IDLDir, WebrefVersion)
 		return nil
 	}
-	return FetchIDL(repoRoot)
+	return FetchIDL(repoRoot, narrate)
 }
 
 // FetchIDL downloads the pinned @webref/idl tarball, verifies its sha256, and
@@ -118,9 +121,9 @@ func EnsureIDL(repoRoot string, force bool) error {
 // It talks to the npm registry over HTTPS directly rather than shelling out to
 // npm: the tool then has no dependency beyond the Go toolchain, and behaves
 // identically on Windows, macOS, and Linux.
-func FetchIDL(repoRoot string) error {
+func FetchIDL(repoRoot string, narrate io.Writer) error {
 	url := fmt.Sprintf(webrefTarball, WebrefVersion)
-	fmt.Printf("    fetching @webref/idl@%s\n", WebrefVersion)
+	fmt.Fprintf(narrate, "    fetching @webref/idl@%s\n", WebrefVersion)
 
 	body, err := download(url)
 	if err != nil {
@@ -163,7 +166,7 @@ func FetchIDL(repoRoot string) error {
 		return fmt.Errorf("writing %s: %w", stamp, err)
 	}
 
-	fmt.Printf("    extracted %d spec(s) into %s/\n", len(found), IDLDir)
+	fmt.Fprintf(narrate, "    extracted %d spec(s) into %s/\n", len(found), IDLDir)
 	return nil
 }
 
