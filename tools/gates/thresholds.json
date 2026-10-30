@@ -1,0 +1,14 @@
+{
+  "unformatted_files": { "direction": "at_most", "cap": 0 },
+  "unbuildable_packages": { "direction": "at_most", "cap": 0 },
+  "unbuildable_modules": { "direction": "at_most", "cap": 0 },
+  "check_findings": { "direction": "at_most", "cap": 0 },
+  "docs_errors": { "direction": "at_most", "cap": 0 },
+  "failed_tests": { "direction": "at_most", "cap": 0 },
+  "failed_packages": { "direction": "at_most", "cap": 0 },
+  "leaked_tests": { "direction": "at_most", "cap": 0 },
+  "missing_toolchains": { "direction": "at_most", "cap": 0 },
+  "worktree_free_bytes": { "direction": "at_least", "cap": 1073741824 },
+  "cache_free_bytes": { "direction": "at_least", "cap": 1073741824 },
+  "combined_free_bytes": { "direction": "at_least", "cap": 2147483648 }
+}

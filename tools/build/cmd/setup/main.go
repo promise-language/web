@@ -1,22 +1,20 @@
+// Command setup makes a fresh clone ready to gate its own commits.
+//
+// It is one call into the library and the definition beside it: what it parses,
+// how it reports, what it wires and what it exits with are not this file's.
 package main
 
 import (
-	"fmt"
 	"os"
+
+	"github.com/promise-language/forge/primitives/tooling"
 
 	"github.com/promise-language/web/tools/build/common"
 )
 
-var (
-	repoRoot   = ""
-	sourceHash = ""
-)
+// stamp is written at link time by ./make.
+var stamp string
 
 func main() {
-	common.CheckStale(repoRoot, sourceHash)
-	if err := common.RunSetup(repoRoot); err != nil {
-		fmt.Fprintln(os.Stderr, "setup failed:", err)
-		os.Exit(1)
-	}
-	fmt.Println("git hooks configured (core.hooksPath = .githooks)")
+	os.Exit(tooling.SetupTool(common.Define(), stamp).Run(os.Args[1:]))
 }
