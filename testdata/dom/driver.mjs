@@ -124,7 +124,9 @@ const noted = (key, want) => {
 {
   const [body] = created("body");
   check("named-root", body !== undefined && page === body,
-    "web.document is the page's document: the body the program assigned through it is document.body");
+    body === undefined ? "the program created no body through web.document"
+      : page === body ? "web.document is the page's document: the body the program assigned through it is document.body"
+        : "the body the program assigned through web.document is not document.body");
 }
 {
   const before = noted("body-before", "absent");
@@ -155,18 +157,33 @@ const noted = (key, want) => {
   check("inheritance-text-read", text.ok, text.detail);
 }
 {
-  // Every wrapper the program held has dropped, so no slot above the seeded
-  // ones may still hold an object.
+  // Every wrapper the program held has dropped, so every slot above the seeded
+  // ones it used is free again, exactly once. Fresh stores then fill the slots
+  // above the seeded ones without a gap and without a repeat. A slot never
+  // released leaves a gap whatever it holds — undefined included, which is
+  // what an unreleased JsValue temporary holds, so reading the slots could not
+  // tell it from a free one — and a slot released twice is handed out twice.
+  // The probes outnumber the handles the program ever holds.
   const seeded = 3;
-  const live = [];
-  for (let handle = seeded + 1; handle <= 4096; handle++) {
-    if (glue._refLoad(handle) !== undefined) live.push(handle);
+  const probes = 4096;
+  const seen = new Set();
+  const twice = [];
+  for (let i = 0; i < probes; i++) {
+    const handle = glue._refStore({});
+    if (seen.has(handle)) twice.push(handle);
+    seen.add(handle);
   }
-  records.push({
-    check: "handles-released",
-    status: live.length === 0 ? "pass" : "leak",
-    detail: live.length === 0 ? "every handle the program held was released" : `handles still live after the program: ${live.join(", ")}`,
-  });
+  const gaps = [];
+  for (let handle = seeded + 1; handle <= seeded + probes; handle++) {
+    if (!seen.has(handle)) gaps.push(handle);
+  }
+  records.push(
+    twice.length > 0
+      ? { check: "handles-released", status: "fail", detail: `handles released more than once: ${[...new Set(twice)].join(", ")}` }
+      : gaps.length > 0
+        ? { check: "handles-released", status: "leak", detail: `handles never released: ${gaps.join(", ")}` }
+        : { check: "handles-released", status: "pass", detail: "every handle the program held was released, once" },
+  );
 }
 
 for (const r of records) process.stdout.write(JSON.stringify(r) + "\n");

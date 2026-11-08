@@ -76,7 +76,13 @@ func RunBindgen(ctx context.Context, repoRoot string, in BindgenInput, narrate i
 	if err != nil {
 		return Bindings{}, err
 	}
+	return regenerate(ctx, repoRoot, compiler, in, narrate)
+}
 
+// regenerate is RunBindgen once the pinned compiler is resolved: the inputs
+// ensured, the keep list checked against Baseline before the compiler runs at
+// all, then `promise bind webidl` and the copy back.
+func regenerate(ctx context.Context, repoRoot, compiler string, in BindgenInput, narrate io.Writer) (Bindings, error) {
 	fmt.Fprintln(narrate, "==> pinned inputs")
 	baseline := BaselineInput()
 	for _, input := range []PinnedInput{IDLInput(), baseline} {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -63,10 +64,27 @@ func webTested(r *tooling.Run, u tooling.Unit) (tooling.UnitResult, error) {
 	}
 
 	result := tallyDOMChecks(records)
+	narrateFailures(r.Narrate, u.Label(), result.Members)
 	if over {
 		result.Incomplete = tooling.OverflowReason("node driver.mjs")
 	}
 	return result, nil
+}
+
+// narrateFailures writes each check that did not pass onto the narration, under
+// the unit's prefix: its name and outcome, then what it said. The driver's
+// stdout is parsed rather than relayed, so nothing else shows a person watching
+// which check failed (forge docs/project-tools.md, What the standard toolchains
+// measure: each failure is named in the envelope and in the narration).
+func narrateFailures(w io.Writer, label string, members []tooling.Member) {
+	for _, m := range members {
+		fmt.Fprintf(w, "%s: --- %s (%s)\n", label, m.Name, m.Outcome)
+		for _, line := range strings.Split(strings.TrimRight(m.Detail, " \t\r\n"), "\n") {
+			if line != "" {
+				fmt.Fprintf(w, "%s: %s\n", label, line)
+			}
+		}
+	}
 }
 
 // buildDOMCheck builds the unit's check program for wasm32-web into scratch
@@ -85,14 +103,27 @@ func buildDOMCheck(r *tooling.Run, u tooling.Unit) (wasm, incomplete string, err
 	wasm = filepath.Join(into, "main.wasm")
 
 	_, stderr, over, buildErr := r.Output(check, "promise", "build", "-target", "wasm32-web", "-o", wasm)
-	switch {
-	case buildErr != nil:
-		return "", fmt.Sprintf("promise build -target wasm32-web of %s failed (%v), and says only in prose whether its sources or its toolchain did (promise-language/promise#605): %s",
-			check.Dir, buildErr, firstLine(stderr)), nil
-	case over:
-		return "", tooling.OverflowReason("promise build -target wasm32-web"), nil
+	var reasons []string
+	if over {
+		reasons = append(reasons, tooling.OverflowReason("promise build -target wasm32-web"))
+	}
+	if buildErr != nil {
+		reasons = append(reasons, fmt.Sprintf("promise build -target wasm32-web of %s failed (%v), and says only in prose whether its sources or its toolchain did (promise-language/promise#605): %s",
+			check.Dir, buildErr, fromRoot(r.Root, firstLine(stderr))))
+	}
+	if len(reasons) > 0 {
+		return "", strings.Join(reasons, "; "), nil
 	}
 	return wasm, "", nil
+}
+
+// fromRoot writes what a line says about a path under root from the repository
+// root. The compiler is handed absolute paths and names files by them; a
+// reason is written from the repository root, so it does not carry the
+// runner's home directory (forge docs/project-tools.md, What the standard
+// toolchains measure).
+func fromRoot(root, line string) string {
+	return strings.ReplaceAll(line, root+string(os.PathSeparator), "")
 }
 
 // firstLine is the first line of text that says something, for a reason
@@ -152,6 +183,9 @@ func decodeDOMChecks(out string) ([]domCheckRecord, error) {
 		var record domCheckRecord
 		if err := dec.Decode(&record); err != nil {
 			return nil, fmt.Errorf("line %d, %q: %w", i+1, line, err)
+		}
+		if rest := strings.TrimSpace(line[dec.InputOffset():]); rest != "" {
+			return nil, fmt.Errorf("line %d, %q: carries %q after its one record", i+1, line, rest)
 		}
 		if record.Check == "" || record.Status == "" {
 			return nil, fmt.Errorf("line %d, %q: a record names its check and its status", i+1, line)

@@ -111,7 +111,7 @@ the generator, the spec list or the keep list.
 [`testdata/dom`](testdata/dom): a check program, built against the generated
 module and run by the pinned Node through `web.js` against a minimal DOM, that
 verifies the named root, nullable access, inheritance, the `from` conversion,
-and that every handle the program held is released.
+and that every handle the program held is released exactly once.
 
 ## Usage
 
