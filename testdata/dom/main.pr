@@ -1,0 +1,58 @@
+// The web module's check program: it drives the generated bindings through
+// the surface the keep list retains, built for wasm32-web and run by
+// driver.mjs against a minimal DOM. Every observation is recorded in the page
+// itself, one paragraph per observation, so the driver judges the host's state
+// rather than anything the program says about itself.
+use web "../..";
+
+// note records one observation as a paragraph under page.
+note(web.Document doc, web.HTMLElement page, string move observation) {
+  p := doc.create_element("p", none);
+  p.text_content = observation;
+  page.append_child(p);
+}
+
+main() {
+  doc := web.document;
+
+  // Nullable access: the page starts with no body, and a Document's
+  // textContent is null.
+  body_before := "present";
+  if doc.body is absent {
+    body_before = "absent";
+  }
+  document_text := "present";
+  if doc.text_content is absent {
+    document_text = "absent";
+  }
+
+  // The conversion from createElement's Element to a derived interface.
+  page := web.HTMLElement.from(doc.create_element("body", none))!;
+  doc.body = web.HTMLElement.from(page);
+  body_after := "absent";
+  if doc.body is present {
+    body_after = "present";
+  }
+
+  input := web.HTMLInputElement.from(doc.create_element("input", none))!;
+  input.value = "typed ✓ \"quoted\"";
+  div := "converted";
+  if web.HTMLInputElement.from(doc.create_element("div", none)) is absent {
+    div = "none";
+  }
+
+  // Inheritance: an HTMLInputElement is a Node to append_child, and
+  // text_content, a Node member, is set and read on an HTMLElement.
+  page.append_child(input);
+  heading := web.HTMLElement.from(doc.create_element("h1", none))!;
+  heading.text_content = "hello";
+  page.append_child(heading);
+  heading_text := heading.text_content ?: "absent";
+
+  note(doc, page, "body-before={body_before}");
+  note(doc, page, "document-text={document_text}");
+  note(doc, page, "body-after={body_after}");
+  note(doc, page, "value={input.value}");
+  note(doc, page, "div={div}");
+  note(doc, page, "heading-text={heading_text}");
+}
