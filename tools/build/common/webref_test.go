@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -154,10 +155,12 @@ func TestPinnedInputFresh(t *testing.T) {
 }
 
 // servedInput is an input whose tarball a local server serves, pinned to the
-// sha256 given.
-func servedInput(t *testing.T, tarball []byte, pin string) PinnedInput {
+// sha256 given, and the count of the requests the server has answered.
+func servedInput(t *testing.T, tarball []byte, pin string) (PinnedInput, *atomic.Int32) {
 	t.Helper()
+	var requests atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
 		if _, err := w.Write(tarball); err != nil {
 			t.Error(err)
 		}
@@ -170,7 +173,7 @@ func servedInput(t *testing.T, tarball []byte, pin string) PinnedInput {
 		Tarball: srv.URL + "/probe-1.0.0.tgz",
 		Dir:     "probe",
 		Members: []string{"data.json"},
-	}
+	}, &requests
 }
 
 func sha256Hex(b []byte) string {
@@ -182,7 +185,7 @@ func sha256Hex(b []byte) string {
 // extracted, so a changed release never regenerates the bindings silently.
 func TestFetchRefusesATarballThatDoesNotMatchItsPin(t *testing.T) {
 	tarball := buildTarball(t, map[string]string{"package/data.json": "{}"})
-	p := servedInput(t, tarball, strings.Repeat("ab", 32))
+	p, _ := servedInput(t, tarball, strings.Repeat("ab", 32))
 	root := t.TempDir()
 
 	err := p.Fetch(root, io.Discard)
@@ -202,7 +205,7 @@ func TestFetchExtractsAndStampsAMatchingTarball(t *testing.T) {
 		"package/data.json": `{"features":{}}`,
 		"package/other.js":  "not wanted",
 	})
-	p := servedInput(t, tarball, sha256Hex(tarball))
+	p, _ := servedInput(t, tarball, sha256Hex(tarball))
 	root := t.TempDir()
 
 	if err := p.Fetch(root, io.Discard); err != nil {
@@ -216,10 +219,51 @@ func TestFetchExtractsAndStampsAMatchingTarball(t *testing.T) {
 	}
 }
 
+// Ensure gates the network: it fetches an input that is absent or stale, and
+// one -force names, and leaves a fresh one alone.
+func TestEnsureFetchesOnlyWhenItHasTo(t *testing.T) {
+	tarball := buildTarball(t, map[string]string{"package/data.json": "{}"})
+	p, requests := servedInput(t, tarball, sha256Hex(tarball))
+	root := t.TempDir()
+
+	steps := []struct {
+		what  string
+		force bool
+		stale func()
+		want  int32 // requests answered after the step
+	}{
+		{what: "absent", want: 1},
+		{what: "fresh", want: 1},
+		{what: "fresh and forced", force: true, want: 2},
+		{what: "stamped with another version", want: 3, stale: func() {
+			writeFile(t, filepath.Join(root, p.Dir), "VERSION", "0.9.0\n")
+		}},
+		{what: "missing a member", want: 4, stale: func() {
+			if err := os.Remove(filepath.Join(root, p.Dir, "data.json")); err != nil {
+				t.Fatal(err)
+			}
+		}},
+	}
+	for _, s := range steps {
+		if s.stale != nil {
+			s.stale()
+		}
+		if err := p.Ensure(root, s.force, io.Discard); err != nil {
+			t.Fatalf("Ensure over an input %s: %v", s.what, err)
+		}
+		if got := requests.Load(); got != s.want {
+			t.Errorf("an input %s: %d request(s) in all, want %d", s.what, got, s.want)
+		}
+		if !p.Fresh(root) {
+			t.Errorf("an input %s is stale after Ensure", s.what)
+		}
+	}
+}
+
 // A member the release does not carry is a missing input, never a short one.
 func TestFetchReportsAMissingMember(t *testing.T) {
 	tarball := buildTarball(t, map[string]string{"package/README.md": "no data"})
-	p := servedInput(t, tarball, sha256Hex(tarball))
+	p, _ := servedInput(t, tarball, sha256Hex(tarball))
 
 	err := p.Fetch(t.TempDir(), io.Discard)
 	if err == nil || !strings.Contains(err.Error(), "data.json") {

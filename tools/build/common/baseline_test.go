@@ -98,6 +98,22 @@ func TestCheckKeepList(t *testing.T) {
 	})
 }
 
+// A compat key two features report alike is read, not refused: the pinned
+// web-features lists some keys under more than one feature (api.HTMLMediaElement
+// under both audio and video), so only a disagreement answers nothing.
+func TestReadBaselineAcceptsAKeyTwoFeaturesReportAlike(t *testing.T) {
+	path := writeFile(t, t.TempDir(), "data.json", `{"features": {
+		"audio": {"status": {"by_compat_key": {"api.HTMLMediaElement": {"baseline": "low"}}}},
+		"video": {"status": {"by_compat_key": {"api.HTMLMediaElement": {"baseline": "low"}}}}}}`)
+	got, err := ReadBaseline(path)
+	if err != nil {
+		t.Fatalf("ReadBaseline refused a key two features report alike: %v", err)
+	}
+	if got["api.HTMLMediaElement"] != BaselineLow {
+		t.Errorf("api.HTMLMediaElement = %v, want BaselineLow", got["api.HTMLMediaElement"])
+	}
+}
+
 // The Baseline data is third-party: anything it states outside the closed set
 // of statuses, or that is not its shape at all, is refused rather than read
 // as some status.

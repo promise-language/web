@@ -39,13 +39,19 @@ func Define() tooling.Project {
 	p := tooling.Standard()
 	p.Require("promise", promise)
 	p.Require("promise", node)
+	// The tools' own tests run the DOM check driver under the same node
+	// (domdriver_test.go), so the Go toolchain declares it too.
+	p.Require("go", node)
 	for i := range p.Toolchains {
-		if p.Toolchains[i].Name == tooling.Promise().Name {
+		switch p.Toolchains[i].Name {
+		case tooling.Promise().Name:
 			// The web module builds and tests for wasm32-web through its check
 			// program (domcheck.go), which the pinned node runs.
 			p.Toolchains[i].Needs = append(p.Toolchains[i].Needs, node.Name)
 			p.Toolchains[i].Measure[tooling.Builds] = webBuilds
 			p.Toolchains[i].Measure[tooling.Tested] = webTested
+		case tooling.Go().Name:
+			p.Toolchains[i].Needs = append(p.Toolchains[i].Needs, node.Name)
 		}
 	}
 	return p
