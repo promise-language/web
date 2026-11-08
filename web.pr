@@ -1,0 +1,1370 @@
+enum JsValue `public `doc("Represents a dynamic JavaScript value.") {
+  Undefined,
+  Null,
+  Bool(bool value),
+  Number(f64 value),
+  Str(string value),
+  Object(i32 _js_ref),
+  Array(i32 _js_ref),
+  Function(i32 _js_ref),
+
+  get is_undefined bool `public `doc("Returns true if this value is undefined.") {
+    return this is Undefined;
+  }
+
+  get is_null bool `public `doc("Returns true if this value is null.") {
+    return this is Null;
+  }
+
+  as_bool(this) bool? `public `doc("Returns the bool value, or none if not a Bool.") {
+    return match this {
+      Bool(v) => v, _ => none,
+    };
+  }
+
+  as_number(this) f64? `public `doc("Returns the number value, or none if not a Number.") {
+    return match this {
+      Number(v) => v, _ => none,
+    };
+  }
+
+  as_string(this) string? `public `doc("Returns the string value, or none if not a Str.") {
+    return match this {
+      Str(v) => v, _ => none,
+    };
+  }
+}
+
+_js_value_to_ref(JsValue value) i32 `target(web) {
+  return match value {
+    Undefined => _js_value_undefined(),
+    Null => _js_value_null(),
+    Bool(v) => _js_value_bool(v),
+    Number(v) => _js_value_number(v),
+    Str(v) => _js_value_str(v),
+    Object(r) => r,
+    Array(r) => r,
+    Function(r) => r,
+  };
+}
+
+_js_value_from_ref(i32 ref) JsValue `target(web) {
+  tag := _js_value_tag(ref);
+  if tag == 0 {
+    _js_value_release(ref);
+    return JsValue.Undefined;
+  }
+  if tag == 1 {
+    _js_value_release(ref);
+    return JsValue.Null;
+  }
+  if tag == 2 {
+    lifted := JsValue.Bool(value: _js_value_get_bool(ref));
+    _js_value_release(ref);
+    return lifted;
+  }
+  if tag == 3 {
+    lifted := JsValue.Number(value: _js_value_get_number(ref));
+    _js_value_release(ref);
+    return lifted;
+  }
+  if tag == 4 {
+    lifted := JsValue.Str(value: _js_value_get_str(ref));
+    _js_value_release(ref);
+    return lifted;
+  }
+  if tag == 6 {
+    return JsValue.Array(_js_ref: ref);
+  }
+  if tag == 7 {
+    return JsValue.Function(_js_ref: ref);
+  }
+  return JsValue.Object(_js_ref: ref);
+}
+
+_js_value_undefined() i32 `extern("js_value_undefined") `wasm_import("promise_env", "js_value_undefined") `target(web);
+
+_js_value_null() i32 `extern("js_value_null") `wasm_import("promise_env", "js_value_null") `target(web);
+
+_js_value_bool(bool value) i32 `extern("js_value_bool") `wasm_import("promise_env", "js_value_bool") `target(web);
+
+_js_value_number(f64 value) i32 `extern("js_value_number") `wasm_import("promise_env", "js_value_number") `target(web);
+
+_js_value_str(string value) i32 `extern("js_value_str") `wasm_import("promise_env", "js_value_str") `target(web);
+
+_js_value_tag(i32 ref) i32 `extern("js_value_tag") `wasm_import("promise_env", "js_value_tag") `target(web);
+
+_js_value_get_bool(i32 ref) bool `extern("js_value_get_bool") `wasm_import("promise_env", "js_value_get_bool") `target(web);
+
+_js_value_get_number(i32 ref) f64 `extern("js_value_get_number") `wasm_import("promise_env", "js_value_get_number") `target(web);
+
+_js_value_get_str(i32 ref) string `extern("js_value_get_str") `wasm_import("promise_env", "js_value_get_str") `target(web);
+
+_js_value_release(i32 ref) `extern("js_value_release") `wasm_import("promise_env", "js_value_release") `target(web);
+
+enum ShadowRootMode `public `doc("`ShadowRootMode` (WebIDL enum)") {
+  Open,
+  Closed,
+}
+
+enum SlotAssignmentMode `public `doc("`SlotAssignmentMode` (WebIDL enum)") {
+  Manual,
+  Named,
+}
+
+enum DocumentReadyState `public `doc("`DocumentReadyState` (WebIDL enum)") {
+  Loading,
+  Interactive,
+  Complete,
+}
+
+enum DocumentVisibilityState `public `doc("`DocumentVisibilityState` (WebIDL enum)") {
+  Visible,
+  Hidden,
+}
+
+enum CanPlayTypeResult `public `doc("`CanPlayTypeResult` (WebIDL enum)") {
+  Empty,
+  Maybe,
+  Probably,
+}
+
+enum TextTrackMode `public `doc("`TextTrackMode` (WebIDL enum)") {
+  Disabled,
+  Hidden,
+  Showing,
+}
+
+enum TextTrackKind `public `doc("`TextTrackKind` (WebIDL enum)") {
+  Subtitles,
+  Captions,
+  Descriptions,
+  Chapters,
+  Metadata,
+}
+
+enum SelectionMode `public `doc("`SelectionMode` (WebIDL enum)") {
+  Select,
+  Start,
+  End,
+  Preserve,
+}
+
+enum CanvasColorType `public `doc("`CanvasColorType` (WebIDL enum)") {
+  Unorm8,
+  Float16,
+}
+
+enum CanvasFillRule `public `doc("`CanvasFillRule` (WebIDL enum)") {
+  Nonzero,
+  Evenodd,
+}
+
+enum ImageSmoothingQuality `public `doc("`ImageSmoothingQuality` (WebIDL enum)") {
+  Low,
+  Medium,
+  High,
+}
+
+enum CanvasLineCap `public `doc("`CanvasLineCap` (WebIDL enum)") {
+  Butt,
+  Round,
+  Square,
+}
+
+enum CanvasLineJoin `public `doc("`CanvasLineJoin` (WebIDL enum)") {
+  Round,
+  Bevel,
+  Miter,
+}
+
+enum CanvasTextAlign `public `doc("`CanvasTextAlign` (WebIDL enum)") {
+  Start,
+  End,
+  Left,
+  Right,
+  Center,
+}
+
+enum CanvasTextBaseline `public `doc("`CanvasTextBaseline` (WebIDL enum)") {
+  Top,
+  Hanging,
+  Middle,
+  Alphabetic,
+  Ideographic,
+  Bottom,
+}
+
+enum CanvasDirection `public `doc("`CanvasDirection` (WebIDL enum)") {
+  Ltr,
+  Rtl,
+  Inherit,
+}
+
+enum CanvasFontKerning `public `doc("`CanvasFontKerning` (WebIDL enum)") {
+  Auto,
+  Normal,
+  None,
+}
+
+enum CanvasFontStretch `public `doc("`CanvasFontStretch` (WebIDL enum)") {
+  UltraCondensed,
+  ExtraCondensed,
+  Condensed,
+  SemiCondensed,
+  Normal,
+  SemiExpanded,
+  Expanded,
+  ExtraExpanded,
+  UltraExpanded,
+}
+
+enum CanvasFontVariantCaps `public `doc("`CanvasFontVariantCaps` (WebIDL enum)") {
+  Normal,
+  SmallCaps,
+  AllSmallCaps,
+  PetiteCaps,
+  AllPetiteCaps,
+  Unicase,
+  TitlingCaps,
+}
+
+enum CanvasTextRendering `public `doc("`CanvasTextRendering` (WebIDL enum)") {
+  Auto,
+  OptimizeSpeed,
+  OptimizeLegibility,
+  GeometricPrecision,
+}
+
+enum OffscreenRenderingContextId `public `doc("`OffscreenRenderingContextId` (WebIDL enum)") {
+  V2d,
+  Bitmaprenderer,
+  Webgl,
+  Webgl2,
+  Webgpu,
+}
+
+enum PredefinedColorSpace `public `doc("`PredefinedColorSpace` (WebIDL enum)") {
+  Srgb,
+  SrgbLinear,
+  DisplayP3,
+  DisplayP3Linear,
+}
+
+enum ScrollRestoration `public `doc("`ScrollRestoration` (WebIDL enum)") {
+  Auto,
+  Manual,
+}
+
+enum NavigationHistoryBehavior `public `doc("`NavigationHistoryBehavior` (WebIDL enum)") {
+  Auto,
+  Push,
+  Replace,
+}
+
+enum NavigationType `public `doc("`NavigationType` (WebIDL enum)") {
+  Push,
+  Replace,
+  Reload,
+  Traverse,
+}
+
+enum NavigationFocusReset `public `doc("`NavigationFocusReset` (WebIDL enum)") {
+  AfterTransition,
+  Manual,
+}
+
+enum NavigationScrollBehavior `public `doc("`NavigationScrollBehavior` (WebIDL enum)") {
+  AfterTransition,
+  Manual,
+}
+
+enum SanitizerPresets `public `doc("`SanitizerPresets` (WebIDL enum)") {
+  Default,
+}
+
+enum DOMParserSupportedType `public `doc("`DOMParserSupportedType` (WebIDL enum)") {
+  TextHtml,
+  TextXml,
+  ApplicationXml,
+  ApplicationXhtmlXml,
+  ImageSvgXml,
+}
+
+enum ImageDataPixelFormat `public `doc("`ImageDataPixelFormat` (WebIDL enum)") {
+  RgbaUnorm8,
+  RgbaFloat16,
+}
+
+enum ImageOrientation `public `doc("`ImageOrientation` (WebIDL enum)") {
+  FromImage,
+  FlipY,
+}
+
+enum PremultiplyAlpha `public `doc("`PremultiplyAlpha` (WebIDL enum)") {
+  None,
+  Premultiply,
+  Default,
+}
+
+enum ColorSpaceConversion `public `doc("`ColorSpaceConversion` (WebIDL enum)") {
+  None,
+  Default,
+}
+
+enum ResizeQuality `public `doc("`ResizeQuality` (WebIDL enum)") {
+  Pixelated,
+  Low,
+  Medium,
+  High,
+}
+
+enum WorkerType `public `doc("`WorkerType` (WebIDL enum)") {
+  Classic,
+  Module,
+}
+
+enum ScrollBehavior `public `doc("`ScrollBehavior` (WebIDL enum)") {
+  Auto,
+  Instant,
+  Smooth,
+}
+
+enum ScrollLogicalPosition `public `doc("`ScrollLogicalPosition` (WebIDL enum)") {
+  Start,
+  Center,
+  End,
+  Nearest,
+}
+
+enum ScrollIntoViewContainer `public `doc("`ScrollIntoViewContainer` (WebIDL enum)") {
+  All,
+  Nearest,
+}
+
+enum CSSBoxType `public `doc("`CSSBoxType` (WebIDL enum)") {
+  Margin,
+  Border,
+  Padding,
+  Content,
+}
+
+enum XMLHttpRequestResponseType `public `doc("`XMLHttpRequestResponseType` (WebIDL enum)") {
+  Empty,
+  Arraybuffer,
+  Blob,
+  Document,
+  Json,
+  Text,
+}
+
+enum AriaNotifyPriority `public `doc("`AriaNotifyPriority` (WebIDL enum)") {
+  Normal,
+  High,
+}
+
+type EventInit `structural(protocol: false) `public `doc("`EventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+}
+
+type CustomEventInit `structural(protocol: false) `public `doc("`CustomEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  JsValue? detail;
+}
+
+type EventListenerOptions `structural(protocol: false) `public `doc("`EventListenerOptions` (WebIDL dictionary)") {
+  bool? capture;
+}
+
+type AddEventListenerOptions `structural(protocol: false) `public `doc("`AddEventListenerOptions` (WebIDL dictionary)") {
+  bool? capture;
+  bool? passive;
+  bool? once;
+}
+
+type MutationObserverInit `structural(protocol: false) `public `doc("`MutationObserverInit` (WebIDL dictionary)") {
+  bool? child_list;
+  bool? attributes;
+  bool? character_data;
+  bool? subtree;
+  bool? attribute_old_value;
+  bool? character_data_old_value;
+  string[]? attribute_filter;
+}
+
+type GetRootNodeOptions `structural(protocol: false) `public `doc("`GetRootNodeOptions` (WebIDL dictionary)") {
+  bool? composed;
+}
+
+type ElementCreationOptions `structural(protocol: false) `public `doc("`ElementCreationOptions` (WebIDL dictionary)") {
+  string? _is;
+}
+
+type ImportNodeOptions `structural(protocol: false) `public `doc("`ImportNodeOptions` (WebIDL dictionary)") {
+  bool? self_only;
+}
+
+type ShadowRootInit `structural(protocol: false) `public `doc("`ShadowRootInit` (WebIDL dictionary)") {
+  ShadowRootMode mode;
+  bool? delegates_focus;
+  bool? serializable;
+  SlotAssignmentMode? slot_assignment;
+  bool? clonable;
+}
+
+type StaticRangeInit `structural(protocol: false) `public `target(web) `doc("`StaticRangeInit` (WebIDL dictionary)") {
+  Node start_container;
+  u32 start_offset;
+  Node end_container;
+  u32 end_offset;
+}
+
+type ShowPopoverOptions `structural(protocol: false) `public `target(web) `doc("`ShowPopoverOptions` (WebIDL dictionary)") {
+  HTMLElement? source;
+}
+
+type TogglePopoverOptions `structural(protocol: false) `public `target(web) `doc("`TogglePopoverOptions` (WebIDL dictionary)") {
+  HTMLElement? source;
+  bool? force;
+}
+
+type TrackEventInit `structural(protocol: false) `public `doc("`TrackEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  JsValue?? track;
+}
+
+type SubmitEventInit `structural(protocol: false) `public `target(web) `doc("`SubmitEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  HTMLElement?? submitter;
+}
+
+type AssignedNodesOptions `structural(protocol: false) `public `doc("`AssignedNodesOptions` (WebIDL dictionary)") {
+  bool? flatten;
+}
+
+type CanvasRenderingContext2DSettings `structural(protocol: false) `public `doc("`CanvasRenderingContext2DSettings` (WebIDL dictionary)") {
+  bool? alpha;
+  bool? desynchronized;
+  PredefinedColorSpace? color_space;
+  CanvasColorType? color_type;
+  bool? will_read_frequently;
+}
+
+type ImageBitmapRenderingContextSettings `structural(protocol: false) `public `doc("`ImageBitmapRenderingContextSettings` (WebIDL dictionary)") {
+  bool? alpha;
+}
+
+type ImageEncodeOptions `structural(protocol: false) `public `doc("`ImageEncodeOptions` (WebIDL dictionary)") {
+  string? _type;
+  f64? quality;
+}
+
+type ElementDefinitionOptions `structural(protocol: false) `public `doc("`ElementDefinitionOptions` (WebIDL dictionary)") {
+  string? extends;
+}
+
+type ValidityStateFlags `structural(protocol: false) `public `doc("`ValidityStateFlags` (WebIDL dictionary)") {
+  bool? value_missing;
+  bool? type_mismatch;
+  bool? pattern_mismatch;
+  bool? too_long;
+  bool? too_short;
+  bool? range_underflow;
+  bool? range_overflow;
+  bool? step_mismatch;
+  bool? bad_input;
+  bool? custom_error;
+}
+
+type ToggleEventInit `structural(protocol: false) `public `target(web) `doc("`ToggleEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  string? old_state;
+  string? new_state;
+  Element?? source;
+}
+
+type CommandEventInit `structural(protocol: false) `public `target(web) `doc("`CommandEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  Element?? source;
+  string? command;
+}
+
+type FocusOptions `structural(protocol: false) `public `doc("`FocusOptions` (WebIDL dictionary)") {
+  bool? prevent_scroll;
+  bool? focus_visible;
+}
+
+type CloseWatcherOptions `structural(protocol: false) `public `doc("`CloseWatcherOptions` (WebIDL dictionary)") {
+}
+
+type DragEventInit `structural(protocol: false) `public `target(web) `doc("`DragEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  i32? detail;
+  u32? which;
+  bool? ctrl_key;
+  bool? shift_key;
+  bool? alt_key;
+  bool? meta_key;
+  bool? modifier_alt_graph;
+  bool? modifier_caps_lock;
+  bool? modifier_fn;
+  bool? modifier_fn_lock;
+  bool? modifier_hyper;
+  bool? modifier_num_lock;
+  bool? modifier_scroll_lock;
+  bool? modifier_super;
+  bool? modifier_symbol;
+  bool? modifier_symbol_lock;
+  i32? screen_x;
+  i32? screen_y;
+  i32? client_x;
+  i32? client_y;
+  i16? button;
+  u16? buttons;
+  EventTarget?? related_target;
+}
+
+type WindowPostMessageOptions `structural(protocol: false) `public `doc("`WindowPostMessageOptions` (WebIDL dictionary)") {
+  JsValue[]? transfer;
+  string? target_origin;
+}
+
+type NavigationUpdateCurrentEntryOptions `structural(protocol: false) `public `doc("`NavigationUpdateCurrentEntryOptions` (WebIDL dictionary)") {
+  JsValue state;
+}
+
+type NavigationOptions `structural(protocol: false) `public `doc("`NavigationOptions` (WebIDL dictionary)") {
+  JsValue? info;
+}
+
+type NavigationNavigateOptions `structural(protocol: false) `public `doc("`NavigationNavigateOptions` (WebIDL dictionary)") {
+  JsValue? info;
+  JsValue? state;
+  NavigationHistoryBehavior? history;
+}
+
+type NavigationReloadOptions `structural(protocol: false) `public `doc("`NavigationReloadOptions` (WebIDL dictionary)") {
+  JsValue? info;
+  JsValue? state;
+}
+
+type NavigationResult `structural(protocol: false) `public `doc("`NavigationResult` (WebIDL dictionary)") {
+  JsValue? committed;
+  JsValue? finished;
+}
+
+type NavigationInterceptOptions `structural(protocol: false) `public `doc("`NavigationInterceptOptions` (WebIDL dictionary)") {
+  NavigationFocusReset? focus_reset;
+  NavigationScrollBehavior? scroll;
+}
+
+type PopStateEventInit `structural(protocol: false) `public `doc("`PopStateEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  JsValue? state;
+  bool? has_ua_visual_transition;
+}
+
+type HashChangeEventInit `structural(protocol: false) `public `doc("`HashChangeEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  string? old_url;
+  string? new_url;
+}
+
+type PageSwapEventInit `structural(protocol: false) `public `doc("`PageSwapEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+}
+
+type PageRevealEventInit `structural(protocol: false) `public `doc("`PageRevealEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+}
+
+type PageTransitionEventInit `structural(protocol: false) `public `doc("`PageTransitionEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  bool? persisted;
+}
+
+type ErrorEventInit `structural(protocol: false) `public `doc("`ErrorEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  string? message;
+  string? filename;
+  u32? lineno;
+  u32? colno;
+  JsValue? error;
+}
+
+type PromiseRejectionEventInit `structural(protocol: false) `public `doc("`PromiseRejectionEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  JsValue promise;
+  JsValue? reason;
+}
+
+type SetHTMLOptions `structural(protocol: false) `public `doc("`SetHTMLOptions` (WebIDL dictionary)") {
+  JsValue? sanitizer;
+}
+
+type SetHTMLUnsafeOptions `structural(protocol: false) `public `doc("`SetHTMLUnsafeOptions` (WebIDL dictionary)") {
+  JsValue? sanitizer;
+  bool? run_scripts;
+}
+
+type ParseHTMLUnsafeOptions `structural(protocol: false) `public `doc("`ParseHTMLUnsafeOptions` (WebIDL dictionary)") {
+  JsValue? sanitizer;
+}
+
+type GetHTMLOptions `structural(protocol: false) `public `doc("`GetHTMLOptions` (WebIDL dictionary)") {
+  bool? serializable_shadow_roots;
+}
+
+type SanitizerElementNamespace `structural(protocol: false) `public `doc("`SanitizerElementNamespace` (WebIDL dictionary)") {
+  string name;
+  string?? _namespace;
+}
+
+type SanitizerElementNamespaceWithAttributes `structural(protocol: false) `public `doc("Used by \"elements\"") {
+  string name;
+  string?? _namespace;
+  JsValue[]? attributes;
+  JsValue[]? remove_attributes;
+}
+
+type SanitizerAttributeNamespace `structural(protocol: false) `public `doc("`SanitizerAttributeNamespace` (WebIDL dictionary)") {
+  string name;
+  string?? _namespace;
+}
+
+type SanitizerProcessingInstruction `structural(protocol: false) `public `doc("`SanitizerProcessingInstruction` (WebIDL dictionary)") {
+  string target;
+}
+
+type SanitizerConfig `structural(protocol: false) `public `doc("`SanitizerConfig` (WebIDL dictionary)") {
+  JsValue[]? elements;
+  JsValue[]? remove_elements;
+  JsValue[]? replace_with_children_elements;
+  JsValue[]? processing_instructions;
+  JsValue[]? remove_processing_instructions;
+  JsValue[]? attributes;
+  JsValue[]? remove_attributes;
+  bool? comments;
+  bool? data_attributes;
+}
+
+type ImageDataSettings `structural(protocol: false) `public `doc("`ImageDataSettings` (WebIDL dictionary)") {
+  PredefinedColorSpace? color_space;
+  ImageDataPixelFormat? pixel_format;
+}
+
+type ImageBitmapOptions `structural(protocol: false) `public `doc("`ImageBitmapOptions` (WebIDL dictionary)") {
+  ImageOrientation? image_orientation;
+  PremultiplyAlpha? premultiply_alpha;
+  ColorSpaceConversion? color_space_conversion;
+  u32? resize_width;
+  u32? resize_height;
+  ResizeQuality? resize_quality;
+}
+
+type MessageEventInit `structural(protocol: false) `public `doc("`MessageEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  JsValue? data;
+  string? origin;
+  string? last_event_id;
+  JsValue?? source;
+}
+
+type EventSourceInit `structural(protocol: false) `public `doc("`EventSourceInit` (WebIDL dictionary)") {
+  bool? with_credentials;
+}
+
+type StructuredSerializeOptions `structural(protocol: false) `public `doc("`StructuredSerializeOptions` (WebIDL dictionary)") {
+  JsValue[]? transfer;
+}
+
+type WorkerOptions `structural(protocol: false) `public `doc("`WorkerOptions` (WebIDL dictionary)") {
+  string? name;
+  WorkerType? _type;
+}
+
+type SharedWorkerOptions `structural(protocol: false) `public `doc("`SharedWorkerOptions` (WebIDL dictionary)") {
+  string? name;
+  WorkerType? _type;
+  bool? extended_lifetime;
+}
+
+type WorkletOptions `structural(protocol: false) `public `doc("`WorkletOptions` (WebIDL dictionary)") {
+}
+
+type StorageEventInit `structural(protocol: false) `public `doc("`StorageEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  string?? key;
+  string?? old_value;
+  string?? new_value;
+  string? url;
+}
+
+type UIEventInit `structural(protocol: false) `public `doc("`UIEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  i32? detail;
+  u32? which;
+}
+
+type FocusEventInit `structural(protocol: false) `public `target(web) `doc("`FocusEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  i32? detail;
+  u32? which;
+  EventTarget?? related_target;
+}
+
+type InputEventInit `structural(protocol: false) `public `doc("`InputEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  i32? detail;
+  u32? which;
+  string?? data;
+  bool? is_composing;
+  string? input_type;
+}
+
+type KeyboardEventInit `structural(protocol: false) `public `doc("`KeyboardEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  i32? detail;
+  u32? which;
+  bool? ctrl_key;
+  bool? shift_key;
+  bool? alt_key;
+  bool? meta_key;
+  bool? modifier_alt_graph;
+  bool? modifier_caps_lock;
+  bool? modifier_fn;
+  bool? modifier_fn_lock;
+  bool? modifier_hyper;
+  bool? modifier_num_lock;
+  bool? modifier_scroll_lock;
+  bool? modifier_super;
+  bool? modifier_symbol;
+  bool? modifier_symbol_lock;
+  string? key;
+  string? code;
+  u32? location;
+  bool? repeat;
+  bool? is_composing;
+  u32? char_code;
+  u32? key_code;
+}
+
+type EventModifierInit `structural(protocol: false) `public `doc("`EventModifierInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  i32? detail;
+  u32? which;
+  bool? ctrl_key;
+  bool? shift_key;
+  bool? alt_key;
+  bool? meta_key;
+  bool? modifier_alt_graph;
+  bool? modifier_caps_lock;
+  bool? modifier_fn;
+  bool? modifier_fn_lock;
+  bool? modifier_hyper;
+  bool? modifier_num_lock;
+  bool? modifier_scroll_lock;
+  bool? modifier_super;
+  bool? modifier_symbol;
+  bool? modifier_symbol_lock;
+}
+
+type CompositionEventInit `structural(protocol: false) `public `doc("`CompositionEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  i32? detail;
+  u32? which;
+  string? data;
+}
+
+type MouseEventInit `structural(protocol: false) `public `target(web) `doc("`MouseEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  i32? detail;
+  u32? which;
+  bool? ctrl_key;
+  bool? shift_key;
+  bool? alt_key;
+  bool? meta_key;
+  bool? modifier_alt_graph;
+  bool? modifier_caps_lock;
+  bool? modifier_fn;
+  bool? modifier_fn_lock;
+  bool? modifier_hyper;
+  bool? modifier_num_lock;
+  bool? modifier_scroll_lock;
+  bool? modifier_super;
+  bool? modifier_symbol;
+  bool? modifier_symbol_lock;
+  i32? screen_x;
+  i32? screen_y;
+  i32? client_x;
+  i32? client_y;
+  i16? button;
+  u16? buttons;
+  EventTarget?? related_target;
+}
+
+type PointerEventInit `structural(protocol: false) `public `target(web) `doc("`PointerEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  i32? detail;
+  u32? which;
+  bool? ctrl_key;
+  bool? shift_key;
+  bool? alt_key;
+  bool? meta_key;
+  bool? modifier_alt_graph;
+  bool? modifier_caps_lock;
+  bool? modifier_fn;
+  bool? modifier_fn_lock;
+  bool? modifier_hyper;
+  bool? modifier_num_lock;
+  bool? modifier_scroll_lock;
+  bool? modifier_super;
+  bool? modifier_symbol;
+  bool? modifier_symbol_lock;
+  i32? screen_x;
+  i32? screen_y;
+  i32? client_x;
+  i32? client_y;
+  i16? button;
+  u16? buttons;
+  EventTarget?? related_target;
+  i32? pointer_id;
+  f64? width;
+  f64? height;
+  f32? pressure;
+  f32? tangential_pressure;
+  i32? tilt_x;
+  i32? tilt_y;
+  i32? twist;
+  f64? altitude_angle;
+  f64? azimuth_angle;
+  string? pointer_type;
+  bool? is_primary;
+  i32? persistent_device_id;
+}
+
+type WheelEventInit `structural(protocol: false) `public `target(web) `doc("`WheelEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  i32? detail;
+  u32? which;
+  bool? ctrl_key;
+  bool? shift_key;
+  bool? alt_key;
+  bool? meta_key;
+  bool? modifier_alt_graph;
+  bool? modifier_caps_lock;
+  bool? modifier_fn;
+  bool? modifier_fn_lock;
+  bool? modifier_hyper;
+  bool? modifier_num_lock;
+  bool? modifier_scroll_lock;
+  bool? modifier_super;
+  bool? modifier_symbol;
+  bool? modifier_symbol_lock;
+  i32? screen_x;
+  i32? screen_y;
+  i32? client_x;
+  i32? client_y;
+  i16? button;
+  u16? buttons;
+  EventTarget?? related_target;
+  f64? delta_x;
+  f64? delta_y;
+  f64? delta_z;
+  u32? delta_mode;
+  bool? momentum;
+}
+
+type CSSStyleSheetInit `structural(protocol: false) `public `doc("`CSSStyleSheetInit` (WebIDL dictionary)") {
+  string?? base_url;
+  JsValue? media;
+  bool? disabled;
+}
+
+type ScrollOptions `structural(protocol: false) `public `doc("`ScrollOptions` (WebIDL dictionary)") {
+  ScrollBehavior? behavior;
+}
+
+type ScrollToOptions `structural(protocol: false) `public `doc("`ScrollToOptions` (WebIDL dictionary)") {
+  ScrollBehavior? behavior;
+  f64? left;
+  f64? top;
+}
+
+type MediaQueryListEventInit `structural(protocol: false) `public `doc("`MediaQueryListEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  string? media;
+  bool? matches;
+}
+
+type CaretPositionFromPointOptions `structural(protocol: false) `public `doc("`CaretPositionFromPointOptions` (WebIDL dictionary)") {
+}
+
+type ScrollIntoViewOptions `structural(protocol: false) `public `doc("`ScrollIntoViewOptions` (WebIDL dictionary)") {
+  ScrollBehavior? behavior;
+  ScrollLogicalPosition? block;
+  ScrollLogicalPosition? inline;
+  ScrollIntoViewContainer? container;
+}
+
+type CheckVisibilityOptions `structural(protocol: false) `public `doc("`CheckVisibilityOptions` (WebIDL dictionary)") {
+  bool? check_opacity;
+  bool? check_visibility_css;
+  bool? content_visibility_auto;
+  bool? opacity_property;
+  bool? visibility_property;
+}
+
+type BoxQuadOptions `structural(protocol: false) `public `doc("`BoxQuadOptions` (WebIDL dictionary)") {
+  CSSBoxType? box;
+  JsValue? relative_to;
+}
+
+type ConvertCoordinateOptions `structural(protocol: false) `public `doc("`ConvertCoordinateOptions` (WebIDL dictionary)") {
+  CSSBoxType? from_box;
+  CSSBoxType? to_box;
+}
+
+type DOMPointInit `structural(protocol: false) `public `doc("`DOMPointInit` (WebIDL dictionary)") {
+  f64? x;
+  f64? y;
+  f64? z;
+  f64? w;
+}
+
+type DOMRectInit `structural(protocol: false) `public `doc("`DOMRectInit` (WebIDL dictionary)") {
+  f64? x;
+  f64? y;
+  f64? width;
+  f64? height;
+}
+
+type DOMQuadInit `structural(protocol: false) `public `doc("`DOMQuadInit` (WebIDL dictionary)") {
+  DOMPointInit? p1;
+  DOMPointInit? p2;
+  DOMPointInit? p3;
+  DOMPointInit? p4;
+}
+
+type DOMMatrix2DInit `structural(protocol: false) `public `doc("`DOMMatrix2DInit` (WebIDL dictionary)") {
+  f64? a;
+  f64? b;
+  f64? c;
+  f64? d;
+  f64? e;
+  f64? f;
+  f64? m11;
+  f64? m12;
+  f64? m21;
+  f64? m22;
+  f64? m41;
+  f64? m42;
+}
+
+type DOMMatrixInit `structural(protocol: false) `public `doc("`DOMMatrixInit` (WebIDL dictionary)") {
+  f64? a;
+  f64? b;
+  f64? c;
+  f64? d;
+  f64? e;
+  f64? f;
+  f64? m11;
+  f64? m12;
+  f64? m21;
+  f64? m22;
+  f64? m41;
+  f64? m42;
+  f64? m13;
+  f64? m14;
+  f64? m23;
+  f64? m24;
+  f64? m31;
+  f64? m32;
+  f64? m33;
+  f64? m34;
+  f64? m43;
+  f64? m44;
+  bool? is2d;
+}
+
+type ProgressEventInit `structural(protocol: false) `public `doc("`ProgressEventInit` (WebIDL dictionary)") {
+  bool? bubbles;
+  bool? cancelable;
+  bool? composed;
+  bool? length_computable;
+  f64? loaded;
+  f64? total;
+}
+
+type AriaNotificationOptions `structural(protocol: false) `public `doc("`AriaNotificationOptions` (WebIDL dictionary)") {
+  AriaNotifyPriority? priority;
+}
+
+type SVGBoundingBoxOptions `structural(protocol: false) `public `doc("`SVGBoundingBoxOptions` (WebIDL dictionary)") {
+  bool? fill;
+  bool? stroke;
+  bool? markers;
+  bool? clipped;
+}
+
+type EventTarget `structural(protocol: false) `public `target(web) `doc("`EventTarget` (WebIDL interface)") {
+  i32 _handle;
+  bool _owned;
+
+  borrow(i32 handle) EventTarget `public `global `doc("Wrap an existing host handle without taking ownership. Dropping the returned wrapper does not release the handle; its owner (or the host) remains responsible for it.") {
+    return EventTarget(_handle: handle, _owned: false);
+  }
+
+  drop(~this) {
+    if this._owned {
+      _event_target_drop(this._handle);
+    }
+  }
+}
+
+_event_target_drop(i32 handle) `extern("event_target_drop") `wasm_import("promise_env", "[resource-drop]event-target") `target(web);
+
+type Node is EventTarget `structural(protocol: false) `public `target(web) `doc("`Node` (WebIDL interface)") {
+  borrow(i32 handle) Node `public `global `doc("Wrap an existing host handle without taking ownership. Dropping the returned wrapper does not release the handle; its owner (or the host) remains responsible for it.") {
+    return Node(_handle: handle, _owned: false);
+  }
+
+  from(EventTarget wrapper) Node? `public `global `doc("Convert a wrapper whose host object is an instance of this interface to this type, or none when it is not. The returned wrapper owns a handle of its own, which it releases when it drops; the wrapper passed in is unchanged and keeps its own handle.") {
+    handle := _node_from(wrapper._handle);
+    if handle == 0 {
+      return none;
+    }
+    return Node(_handle: handle, _owned: true);
+  }
+
+  element_node() u16 `public `global `doc("`Node.ELEMENT_NODE` (WebIDL constant)") {
+    return _node_element_node();
+  }
+
+  attribute_node() u16 `public `global `doc("`Node.ATTRIBUTE_NODE` (WebIDL constant)") {
+    return _node_attribute_node();
+  }
+
+  text_node() u16 `public `global `doc("`Node.TEXT_NODE` (WebIDL constant)") {
+    return _node_text_node();
+  }
+
+  cdata_section_node() u16 `public `global `doc("`Node.CDATA_SECTION_NODE` (WebIDL constant)") {
+    return _node_cdata_section_node();
+  }
+
+  entity_reference_node() u16 `public `global `doc("`Node.ENTITY_REFERENCE_NODE` (WebIDL constant)") {
+    return _node_entity_reference_node();
+  }
+
+  entity_node() u16 `public `global `doc("`Node.ENTITY_NODE` (WebIDL constant)") {
+    return _node_entity_node();
+  }
+
+  processing_instruction_node() u16 `public `global `doc("`Node.PROCESSING_INSTRUCTION_NODE` (WebIDL constant)") {
+    return _node_processing_instruction_node();
+  }
+
+  comment_node() u16 `public `global `doc("`Node.COMMENT_NODE` (WebIDL constant)") {
+    return _node_comment_node();
+  }
+
+  document_node() u16 `public `global `doc("`Node.DOCUMENT_NODE` (WebIDL constant)") {
+    return _node_document_node();
+  }
+
+  document_type_node() u16 `public `global `doc("`Node.DOCUMENT_TYPE_NODE` (WebIDL constant)") {
+    return _node_document_type_node();
+  }
+
+  document_fragment_node() u16 `public `global `doc("`Node.DOCUMENT_FRAGMENT_NODE` (WebIDL constant)") {
+    return _node_document_fragment_node();
+  }
+
+  notation_node() u16 `public `global `doc("`Node.NOTATION_NODE` (WebIDL constant)") {
+    return _node_notation_node();
+  }
+
+  get text_content string? `public `doc("`Node.textContent` (WebIDL attribute)") {
+    return _node_text_content(this._handle);
+  }
+
+  set text_content(string? value) `public `doc("`Node.textContent` (WebIDL attribute)") {
+    _node_set_text_content(this._handle, value ?: "");
+  }
+
+  document_position_disconnected() u16 `public `global `doc("`Node.DOCUMENT_POSITION_DISCONNECTED` (WebIDL constant)") {
+    return _node_document_position_disconnected();
+  }
+
+  document_position_preceding() u16 `public `global `doc("`Node.DOCUMENT_POSITION_PRECEDING` (WebIDL constant)") {
+    return _node_document_position_preceding();
+  }
+
+  document_position_following() u16 `public `global `doc("`Node.DOCUMENT_POSITION_FOLLOWING` (WebIDL constant)") {
+    return _node_document_position_following();
+  }
+
+  document_position_contains() u16 `public `global `doc("`Node.DOCUMENT_POSITION_CONTAINS` (WebIDL constant)") {
+    return _node_document_position_contains();
+  }
+
+  document_position_contained_by() u16 `public `global `doc("`Node.DOCUMENT_POSITION_CONTAINED_BY` (WebIDL constant)") {
+    return _node_document_position_contained_by();
+  }
+
+  document_position_implementation_specific() u16 `public `global `doc("`Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC` (WebIDL constant)") {
+    return _node_document_position_implementation_specific();
+  }
+
+  append_child(this, Node node) Node `public `doc("`Node.appendChild` (WebIDL operation)") {
+    handle := _node_append_child(this._handle, node._handle);
+    return Node(_handle: handle, _owned: true);
+  }
+
+  drop(~this) {
+    if this._owned {
+      _node_drop(this._handle);
+    }
+  }
+}
+
+_node_element_node() u16 `extern("node_element_node") `wasm_import("promise_env", "Node.ELEMENT_NODE") `target(web);
+
+_node_attribute_node() u16 `extern("node_attribute_node") `wasm_import("promise_env", "Node.ATTRIBUTE_NODE") `target(web);
+
+_node_text_node() u16 `extern("node_text_node") `wasm_import("promise_env", "Node.TEXT_NODE") `target(web);
+
+_node_cdata_section_node() u16 `extern("node_cdata_section_node") `wasm_import("promise_env", "Node.CDATA_SECTION_NODE") `target(web);
+
+_node_entity_reference_node() u16 `extern("node_entity_reference_node") `wasm_import("promise_env", "Node.ENTITY_REFERENCE_NODE") `target(web);
+
+_node_entity_node() u16 `extern("node_entity_node") `wasm_import("promise_env", "Node.ENTITY_NODE") `target(web);
+
+_node_processing_instruction_node() u16 `extern("node_processing_instruction_node") `wasm_import("promise_env", "Node.PROCESSING_INSTRUCTION_NODE") `target(web);
+
+_node_comment_node() u16 `extern("node_comment_node") `wasm_import("promise_env", "Node.COMMENT_NODE") `target(web);
+
+_node_document_node() u16 `extern("node_document_node") `wasm_import("promise_env", "Node.DOCUMENT_NODE") `target(web);
+
+_node_document_type_node() u16 `extern("node_document_type_node") `wasm_import("promise_env", "Node.DOCUMENT_TYPE_NODE") `target(web);
+
+_node_document_fragment_node() u16 `extern("node_document_fragment_node") `wasm_import("promise_env", "Node.DOCUMENT_FRAGMENT_NODE") `target(web);
+
+_node_notation_node() u16 `extern("node_notation_node") `wasm_import("promise_env", "Node.NOTATION_NODE") `target(web);
+
+_node_text_content(i32 handle) string? `extern("node_text_content") `wasm_import("promise_env", "Node.textContent.get") `target(web);
+
+_node_set_text_content(i32 handle, string value) `extern("node_set_text_content") `wasm_import("promise_env", "Node.textContent.set") `target(web);
+
+_node_document_position_disconnected() u16 `extern("node_document_position_disconnected") `wasm_import("promise_env", "Node.DOCUMENT_POSITION_DISCONNECTED") `target(web);
+
+_node_document_position_preceding() u16 `extern("node_document_position_preceding") `wasm_import("promise_env", "Node.DOCUMENT_POSITION_PRECEDING") `target(web);
+
+_node_document_position_following() u16 `extern("node_document_position_following") `wasm_import("promise_env", "Node.DOCUMENT_POSITION_FOLLOWING") `target(web);
+
+_node_document_position_contains() u16 `extern("node_document_position_contains") `wasm_import("promise_env", "Node.DOCUMENT_POSITION_CONTAINS") `target(web);
+
+_node_document_position_contained_by() u16 `extern("node_document_position_contained_by") `wasm_import("promise_env", "Node.DOCUMENT_POSITION_CONTAINED_BY") `target(web);
+
+_node_document_position_implementation_specific() u16 `extern("node_document_position_implementation_specific") `wasm_import("promise_env", "Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC") `target(web);
+
+_node_append_child(i32 handle, i32 node) i32 `extern("node_append_child") `wasm_import("promise_env", "Node.appendChild") `target(web);
+
+_node_from(i32 wrapper) i32 `extern("node_from") `wasm_import("promise_env", "[cast]Node") `target(web);
+
+_node_drop(i32 handle) `extern("node_drop") `wasm_import("promise_env", "[resource-drop]node") `target(web);
+
+type Document is Node `structural(protocol: false) `public `target(web) `doc("`Document` (WebIDL interface)") {
+  borrow(i32 handle) Document `public `global `doc("Wrap an existing host handle without taking ownership. Dropping the returned wrapper does not release the handle; its owner (or the host) remains responsible for it.") {
+    return Document(_handle: handle, _owned: false);
+  }
+
+  from(EventTarget wrapper) Document? `public `global `doc("Convert a wrapper whose host object is an instance of this interface to this type, or none when it is not. The returned wrapper owns a handle of its own, which it releases when it drops; the wrapper passed in is unchanged and keeps its own handle.") {
+    handle := _document_from(wrapper._handle);
+    if handle == 0 {
+      return none;
+    }
+    return Document(_handle: handle, _owned: true);
+  }
+
+  create_element(this, string local_name, JsValue? options) Element `public `doc("`Document.createElement` (WebIDL operation)") {
+    handle := _document_create_element(this._handle, local_name, _js_value_to_ref(options ?: JsValue.Undefined));
+    return Element(_handle: handle, _owned: true);
+  }
+
+  getter(this, string name) JsValue `public `doc("DOM tree accessors") {
+    ref := _document_getter(this._handle, name);
+    return _js_value_from_ref(ref);
+  }
+
+  get body HTMLElement? `public `doc("`Document.body` (WebIDL attribute)") {
+    handle := _document_body(this._handle);
+    if handle == 0 {
+      return none;
+    }
+    return HTMLElement(_handle: handle, _owned: true);
+  }
+
+  set body(HTMLElement? value) `public `doc("`Document.body` (WebIDL attribute)") {
+    _document_set_body(this._handle, value?._handle ?: 0);
+  }
+
+  drop(~this) {
+    if this._owned {
+      _document_drop(this._handle);
+    }
+  }
+}
+
+_document_create_element(i32 handle, string local_name, i32 options) i32 `extern("document_create_element") `wasm_import("promise_env", "Document.createElement") `target(web);
+
+_document_getter(i32 handle, string name) i32 `extern("document_getter") `wasm_import("promise_env", "Document.getter") `target(web);
+
+_document_body(i32 handle) i32 `extern("document_body") `wasm_import("promise_env", "Document.body.get") `target(web);
+
+_document_set_body(i32 handle, i32 value) `extern("document_set_body") `wasm_import("promise_env", "Document.body.set") `target(web);
+
+_document_from(i32 wrapper) i32 `extern("document_from") `wasm_import("promise_env", "[cast]Document") `target(web);
+
+_document_drop(i32 handle) `extern("document_drop") `wasm_import("promise_env", "[resource-drop]document") `target(web);
+
+type Element is Node `structural(protocol: false) `public `target(web) `doc("`Element` (WebIDL interface)") {
+  borrow(i32 handle) Element `public `global `doc("Wrap an existing host handle without taking ownership. Dropping the returned wrapper does not release the handle; its owner (or the host) remains responsible for it.") {
+    return Element(_handle: handle, _owned: false);
+  }
+
+  from(EventTarget wrapper) Element? `public `global `doc("Convert a wrapper whose host object is an instance of this interface to this type, or none when it is not. The returned wrapper owns a handle of its own, which it releases when it drops; the wrapper passed in is unchanged and keeps its own handle.") {
+    handle := _element_from(wrapper._handle);
+    if handle == 0 {
+      return none;
+    }
+    return Element(_handle: handle, _owned: true);
+  }
+
+  drop(~this) {
+    if this._owned {
+      _element_drop(this._handle);
+    }
+  }
+}
+
+_element_from(i32 wrapper) i32 `extern("element_from") `wasm_import("promise_env", "[cast]Element") `target(web);
+
+_element_drop(i32 handle) `extern("element_drop") `wasm_import("promise_env", "[resource-drop]element") `target(web);
+
+type HTMLElement is Element `structural(protocol: false) `public `target(web) `doc("`HTMLElement` (WebIDL interface)") {
+  borrow(i32 handle) HTMLElement `public `global `doc("Wrap an existing host handle without taking ownership. Dropping the returned wrapper does not release the handle; its owner (or the host) remains responsible for it.") {
+    return HTMLElement(_handle: handle, _owned: false);
+  }
+
+  from(EventTarget wrapper) HTMLElement? `public `global `doc("Convert a wrapper whose host object is an instance of this interface to this type, or none when it is not. The returned wrapper owns a handle of its own, which it releases when it drops; the wrapper passed in is unchanged and keeps its own handle.") {
+    handle := _html_element_from(wrapper._handle);
+    if handle == 0 {
+      return none;
+    }
+    return HTMLElement(_handle: handle, _owned: true);
+  }
+
+  drop(~this) {
+    if this._owned {
+      _html_element_drop(this._handle);
+    }
+  }
+}
+
+_html_element_from(i32 wrapper) i32 `extern("html_element_from") `wasm_import("promise_env", "[cast]HTMLElement") `target(web);
+
+_html_element_drop(i32 handle) `extern("html_element_drop") `wasm_import("promise_env", "[resource-drop]html-element") `target(web);
+
+type HTMLInputElement is HTMLElement `structural(protocol: false) `public `target(web) `doc("`HTMLInputElement` (WebIDL interface)") {
+  borrow(i32 handle) HTMLInputElement `public `global `doc("Wrap an existing host handle without taking ownership. Dropping the returned wrapper does not release the handle; its owner (or the host) remains responsible for it.") {
+    return HTMLInputElement(_handle: handle, _owned: false);
+  }
+
+  from(EventTarget wrapper) HTMLInputElement? `public `global `doc("Convert a wrapper whose host object is an instance of this interface to this type, or none when it is not. The returned wrapper owns a handle of its own, which it releases when it drops; the wrapper passed in is unchanged and keeps its own handle.") {
+    handle := _html_input_element_from(wrapper._handle);
+    if handle == 0 {
+      return none;
+    }
+    return HTMLInputElement(_handle: handle, _owned: true);
+  }
+
+  get value string `public `doc("`HTMLInputElement.value` (WebIDL attribute)") {
+    return _html_input_element_value(this._handle);
+  }
+
+  set value(string value) `public `doc("`HTMLInputElement.value` (WebIDL attribute)") {
+    _html_input_element_set_value(this._handle, value);
+  }
+
+  drop(~this) {
+    if this._owned {
+      _html_input_element_drop(this._handle);
+    }
+  }
+}
+
+_html_input_element_value(i32 handle) string `extern("html_input_element_value") `wasm_import("promise_env", "HTMLInputElement.value.get") `target(web);
+
+_html_input_element_set_value(i32 handle, string value) `extern("html_input_element_set_value") `wasm_import("promise_env", "HTMLInputElement.value.set") `target(web);
+
+_html_input_element_from(i32 wrapper) i32 `extern("html_input_element_from") `wasm_import("promise_env", "[cast]HTMLInputElement") `target(web);
+
+_html_input_element_drop(i32 handle) `extern("html_input_element_drop") `wasm_import("promise_env", "[resource-drop]html-input-element") `target(web);
+
+get document Document `public `target(web) `doc("The page's document (WebIDL `Document`), seeded by the loader before the program runs. Borrowed: dropping it never releases the host object.") {
+  return Document.borrow(2);
+}

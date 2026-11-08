@@ -1,14 +1,21 @@
 ## Regenerating the bindings
 
 `web.pr` and `web.js` are **generated**. Never hand-edit them — the next
-regeneration silently discards the edit. Fix the generator or the spec list
-instead.
+regeneration silently discards the edit. Fix the generator, the spec list or
+the keep list instead.
 
 ```bash
-bin/bindgen             # fetch pinned WebIDL, regenerate web.pr + web.js
-bin/bindgen -force      # re-fetch idl/ even if already at the pinned version
+bin/bindgen             # fetch pinned WebIDL + Baseline data, check web.keep, regenerate web.pr + web.js
+bin/bindgen -narrate    # the same, showing what `-keep` reports dropping
+bin/bindgen -force      # re-fetch idl/ and baseline/ even if already at the pinned versions
 bin/bindgen -clean      # drop idl/ afterwards
 ```
+
+`bin/bindgen` runs the compiler pinned in
+[`tools/build/common/project.go`](tools/build/common/project.go), resolved from
+`.workspace/dependencies.json` (`workspace dependency sync` fetches it) and never
+from `PATH`, and passes `-keep web.keep`. It refuses a keep list naming anything
+the pinned web-features release does not report Baseline.
 
 `idl/` is gitignored, so there is no copy of the WebIDL in the tree to read.
 `bin/fetch-idl` puts one there without regenerating anything:
@@ -19,10 +26,12 @@ bin/fetch-idl -list     # print the pin and spec list, touch nothing
 bin/fetch-idl -clean    # remove idl/
 ```
 
-The pinned `@webref/idl` release, its tarball sha256, and the list of specs that
-make up the binding surface all live in one file:
+The pinned `@webref/idl` and `web-features` releases, their tarball sha256s, and
+the list of specs that make up the binding surface all live in one file:
 [`tools/build/common/webref.go`](tools/build/common/webref.go). Adding a spec or
-moving to a newer webref release is an edit there, then `./make && bin/bindgen`.
+moving to a newer release of either is an edit there, then `./make && bin/bindgen`.
+What the generated module carries is the keep list, [`web.keep`](web.keep); what
+each entry covers is recorded in README.md's "Coverage".
 
 Two things the generator deliberately does *not* do:
 
@@ -30,9 +39,10 @@ Two things the generator deliberately does *not* do:
   with the compiler epoch; modules here are epoch-less and the repo's
   `promise.toml` is hand-maintained source. Generation happens in a scratch
   directory and only `web.pr` and `web.js` are copied back.
-- **It never commits `idl/`.** The WebIDL inputs are fetched on demand and
-  gitignored, so third-party spec text stays out of the tree. The pin in
-  `webref.go` is what makes a binding diff traceable to a spec revision.
+- **It never commits `idl/` or `baseline/`.** The inputs are fetched on demand
+  and gitignored, so third-party text stays out of the tree. The pins in
+  `webref.go` are what make a binding diff traceable to a spec or compat-data
+  revision.
 
 <!-- forge:dev-tooling -->
 ## Dev tooling

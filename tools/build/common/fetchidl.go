@@ -86,7 +86,7 @@ func PinnedSpecs() Pin {
 // the same fetch itself; neither is a prerequisite for the other.
 func RunFetchIDL(repoRoot string, force bool, narrate io.Writer) (IDLState, error) {
 	fmt.Fprintf(narrate, "==> @webref/idl@%s\n", WebrefVersion)
-	if err := EnsureIDL(repoRoot, force, narrate); err != nil {
+	if err := IDLInput().Ensure(repoRoot, force, narrate); err != nil {
 		return IDLState{}, err
 	}
 	return IDLState{Dir: IDLDir, Version: WebrefVersion, Specs: len(WebrefSpecs)}, nil

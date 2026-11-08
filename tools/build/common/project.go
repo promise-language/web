@@ -38,7 +38,32 @@ import "github.com/promise-language/forge/primitives/tooling"
 func Define() tooling.Project {
 	p := tooling.Standard()
 	p.Require("promise", promise)
+	p.Require("promise", node)
+	for i := range p.Toolchains {
+		if p.Toolchains[i].Name == tooling.Promise().Name {
+			// The web module builds and tests for wasm32-web through its check
+			// program (domcheck.go), which the pinned node runs.
+			p.Toolchains[i].Needs = append(p.Toolchains[i].Needs, node.Name)
+			p.Toolchains[i].Measure[tooling.Builds] = webBuilds
+			p.Toolchains[i].Measure[tooling.Tested] = webTested
+		}
+	}
 	return p
+}
+
+// node runs the web module's DOM check (testdata/dom/driver.mjs): 22.22.2 is
+// the Node the Promise compiler's own wasm32-web harness pins. Its digests are
+// the release's SHASUMS256.txt.
+var node = tooling.Dependency{
+	Name:    "node",
+	Version: "22.22.2",
+	Source:  tooling.NodejsDist{},
+	Platforms: map[string]tooling.Asset{
+		"darwin/arm64":  {Name: "node-v22.22.2-darwin-arm64.tar.gz", Format: tooling.TarGz, Program: "node-v22.22.2-darwin-arm64/bin/node", SHA256: "db4b275b83736df67533529a18cc55de2549a8329ace6c7bcc68f8d22d3c9000"},
+		"linux/amd64":   {Name: "node-v22.22.2-linux-x64.tar.gz", Format: tooling.TarGz, Program: "node-v22.22.2-linux-x64/bin/node", SHA256: "978978a635eef872fa68beae09f0aad0bbbae6757e444da80b570964a97e62a3"},
+		"linux/arm64":   {Name: "node-v22.22.2-linux-arm64.tar.gz", Format: tooling.TarGz, Program: "node-v22.22.2-linux-arm64/bin/node", SHA256: "b2f3a96f31486bfc365192ad65ced14833ad2a3c2e1bcefec4846902f264fa28"},
+		"windows/amd64": {Name: "node-v22.22.2-win-x64.zip", Format: tooling.Zip, Program: "node-v22.22.2-win-x64/node.exe", SHA256: "7c93e9d92bf68c07182b471aa187e35ee6cd08ef0f24ab060dfff605fcc1c57c"},
+	},
 }
 
 // promise is the compiler the promise toolchain runs over this repository's
@@ -47,12 +72,12 @@ func Define() tooling.Project {
 // is an edit here, Version, Tag and every digest together.
 var promise = tooling.Dependency{
 	Name:    "promise",
-	Version: "2026.10",
-	Source:  tooling.GitHubRelease{Repository: "promise-language/promise", Tag: "epoch-2026.10"},
+	Version: "2026.13",
+	Source:  tooling.GitHubRelease{Repository: "promise-language/promise", Tag: "epoch-2026.13"},
 	Platforms: map[string]tooling.Asset{
-		"darwin/arm64":  {Name: "promise-darwin-arm64.gz", Format: tooling.Gzip, SHA256: "de286ae2d32e86b74812dd9fd3b8d8fd8be94a62e90e790c0ab58d1f28d516c3"},
-		"linux/amd64":   {Name: "promise-linux-amd64.gz", Format: tooling.Gzip, SHA256: "7dec9ed47fb6ac92186a360a01d5201bc04062563f3b65193bbdfbc8b02898ba"},
-		"linux/arm64":   {Name: "promise-linux-arm64.gz", Format: tooling.Gzip, SHA256: "6465a132704739921f5a530414316f571f1a0df34341a9331e4dafee75c5ce24"},
-		"windows/amd64": {Name: "promise-windows-amd64.exe.gz", Format: tooling.Gzip, SHA256: "73fad9157387b6f7f18c2028bcc084015f048ee513e692a58ad739e65f02498e"},
+		"darwin/arm64":  {Name: "promise-darwin-arm64.gz", Format: tooling.Gzip, SHA256: "de6ce940381d7669cc63361e470a29164ebb34b53fb2147e497ee66ef6ff74ca"},
+		"linux/amd64":   {Name: "promise-linux-amd64.gz", Format: tooling.Gzip, SHA256: "79a8b654bb54d2a4e3dd637b9631ced0a833ddefefce8f48ca77ae54f97f04a2"},
+		"linux/arm64":   {Name: "promise-linux-arm64.gz", Format: tooling.Gzip, SHA256: "5ce8270e2115111c7e0539802166107b778ed46c5047c821d4aed23c867e23dd"},
+		"windows/amd64": {Name: "promise-windows-amd64.exe.gz", Format: tooling.Gzip, SHA256: "8638258fd468c5eb644fa325ab7cbe7faf00ab3a0e7b868096128e19f720226e"},
 	},
 }

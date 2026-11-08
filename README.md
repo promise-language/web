@@ -13,21 +13,18 @@ Each generated interface becomes a `` `target(web) `` type wrapping an opaque
 `get`/`set` properties and operations as methods:
 
 ```promise
-type Document `public `target(web) {
-    i32 _handle;
-
-    get title string `public { ... }
-    create_element(this, string local_name) Element `public { ... }
+type Document is Node `public `target(web) {
+    get body HTMLElement? `public { ... }
+    set body(HTMLElement? value) `public { ... }
+    create_element(this, string local_name, JsValue? options) Element `public { ... }
 }
 ```
 
-> **Status:** repository scaffolding only — the generated bindings are not in
-> place yet. A hello-world does run in Chrome today, but only from a
-> hand-trimmed IDL subset and with a post-processing pass over the generated
-> glue: the WebIDL path emits canonical-ABI JS while the compiler lowers WebIDL
-> externs the Promise-native way, and the generator does not yet handle
-> interface inheritance or overloaded operations. Those are compiler-side fixes;
-> this repository will carry the bindings once they generate cleanly.
+> **Status:** an explicitly incomplete, app-sized revision. The generated
+> surface is only what the app keep list (`web.keep`) selects, each entry
+> Baseline in the pinned web-features data — enough to build a page under
+> `web.document.body`, read an `<input>`'s value, and set text. The full
+> Baseline surface is a later revision of this same module.
 
 ## Coverage
 
@@ -39,27 +36,63 @@ from the [webref](https://github.com/w3c/webref) curated extraction:
 | WHATWG DOM | `EventTarget`, `Node`, `Element`, `Document`, `Range` |
 | WHATWG HTML | `Window`, `HTMLElement` and the element hierarchy |
 | WHATWG Console | the `console` namespace |
-| UI Events | `UIEvent`, `MouseEvent`, `KeyboardEvent` |
+| UI Events | `UIEvent`, `KeyboardEvent` |
+| Pointer Events | `MouseEvent`, `PointerEvent` |
 | CSSOM | `CSSStyleDeclaration`, `CSSRule`, `StyleSheet` |
 | CSSOM View | `getBoundingClientRect`, scrolling, `DOMRect` on elements |
 | Geometry Interfaces | `DOMPoint`, `DOMRect`, `DOMMatrix` |
+| CSS Pseudo-Elements | `CSSPseudoElement` |
 | WHATWG URL | `URL`, `URLSearchParams` |
 | XMLHttpRequest | `XMLHttpRequest`, `FormData`, `ProgressEvent` |
+| WAI-ARIA | the `ARIAMixin` every element includes |
+| SVG | `SVGElement`, which CSSOM and HTML extend |
+| MathML Core | `MathMLElement`, which CSSOM and HTML extend |
 
-The exact list and the pinned webref revision live in
-[`tools/build/common/webref.go`](tools/build/common/webref.go).
+The last three are bound because the others include or extend what they
+define: `promise bind webidl` refuses a `partial` or `includes` whose target no
+bound file defines.
+
+Of that IDL, the generated module carries only what the keep list
+[`web.keep`](web.keep) names, and `bin/bindgen` refuses a keep list naming
+anything the pinned [web-features](https://github.com/web-platform-dx/web-features)
+release does not report Baseline (newly or widely available across the core
+browsers):
+
+| Keep-list entry | What it gives a program |
+|---|---|
+| `Document`, `Document.body`, `Document.createElement` | the `web.document` root; the page's nullable `body`; `create_element` |
+| `Node`, `Node.appendChild`, `Node.textContent` | `append_child`; nullable `text_content` on every node |
+| `HTMLInputElement`, `HTMLInputElement.value` | an input's `value` |
+
+The ancestors of a kept interface (`EventTarget`, `Element`, `HTMLElement`)
+come with it, so an `HTMLInputElement` is a `Node` wherever one is expected.
+Every interface with a parent has a checked conversion, `from`, which turns the
+`Element` that `create_element` returns into the interface the element really
+is, or `none`.
+
+The spec list, both pins and the keep list's file name live in
+[`tools/build/common/webref.go`](tools/build/common/webref.go) and
+[`tools/build/common/baseline.go`](tools/build/common/baseline.go).
 
 ## Regenerating the bindings
 
-`web.pr` and `web.js` are generated and committed; the WebIDL they are generated
-*from* is not — it is fetched on demand into a gitignored `idl/`, so no
-third-party spec text lives in this tree.
+`web.pr` and `web.js` are generated and committed; the inputs they are generated
+*from* are not — the WebIDL is fetched on demand into a gitignored `idl/` and
+the Baseline data into a gitignored `baseline/`, so no third-party text lives in
+this tree.
 
 ```bash
 ./make            # Windows: .\make.cmd  — compiles the dev tools into bin/
-bin/bindgen       # fetch the pinned WebIDL, regenerate web.pr and web.js
+bin/bindgen       # fetch the pinned inputs, check web.keep, regenerate web.pr and web.js
 bin/verify        # the commit gate
 ```
+
+`bin/bindgen` runs the Promise compiler this project pins
+([`tools/build/common/project.go`](tools/build/common/project.go)), resolved
+from the checkout's dependency record and never from `PATH`, so regenerating
+from the committed pins reproduces the committed files. It relays what
+`promise bind webidl -keep` reports dropping — a member naming something the
+keep list drops — on its narration (`bin/bindgen -narrate`).
 
 To read the WebIDL itself — there is no copy in the tree — materialize it
 separately, or print the pin without fetching anything:
@@ -69,9 +102,16 @@ bin/fetch-idl        # write idl/ at the pinned version
 bin/fetch-idl -list  # print the pinned release and the spec list
 ```
 
-`bin/bindgen` pins `@webref/idl` by version *and* tarball sha256 and refuses to
-run on a mismatch, so a binding diff can always be traced to a spec revision.
-Never hand-edit `web.pr` or `web.js` — fix the generator or the spec list.
+`bin/bindgen` pins `@webref/idl` and `web-features` by version *and* tarball
+sha256 and refuses to run on a mismatch, so a binding diff can always be traced
+to a spec or compat-data revision. Never hand-edit `web.pr` or `web.js` — fix
+the generator, the spec list or the keep list.
+
+`bin/verify` builds the module for `wasm32-web` and tests it through
+[`testdata/dom`](testdata/dom): a check program, built against the generated
+module and run by the pinned Node through `web.js` against a minimal DOM, that
+verifies the named root, nullable access, inheritance, the `from` conversion,
+and that every handle the program held is released.
 
 ## Usage
 
@@ -81,26 +121,22 @@ Registered in the Promise module catalog under the name **`web`**:
 use web;
 
 main() {
-    // The glue seeds handles before calling _initialize: 1 = globalThis,
-    // 2 = document, 3 = console. Generated bindings have no way to name a JS
-    // global, so the roots are constructed from their handles.
-    doc := web.Document(_handle: 2);
-    console := web.Console(_handle: 3);
-
-    console.log("hello from Promise, running as WebAssembly");
-
+    doc := web.document;    // the page's document, a named root: never a handle
     page := doc.body ? {
-        console.log("no document.body — nothing to do");
-        return;
+        return;             // no body yet: nothing to build under
     };
 
-    heading := doc.create_element("h1");
+    heading := doc.create_element("h1", none);
     heading.text_content = "hello world";
-    heading.id = "greeting";
-
     page.append_child(heading);
 
-    console.log("document.title is: {doc.title}");
+    // create_element returns an Element; `from` converts it to the interface
+    // the element really is, or none.
+    input := web.HTMLInputElement.from(doc.create_element("input", none)) ? {
+        return;
+    };
+    input.value = "type here";
+    page.append_child(input);
 }
 ```
 
@@ -119,8 +155,10 @@ promise build -target wasm32-web main.pr    # -> main.wasm
 
 Two things to keep in mind:
 
-- **Handles are owned.** Each wrapper releases its handle when it drops, so
-  never construct a second wrapper over a handle another wrapper already holds.
+- **Wrappers own their handles.** Each wrapper releases its handle when it
+  drops. `from` returns a wrapper with a handle of its own, so the wrapper it
+  converted is unchanged and both drop independently; `web.document` is
+  borrowed, and dropping it releases nothing.
 - **Don't name the consuming project `web`.** Every `wasm32-web` build emits a
   bootstrap loader named after its output, so a project named `web` writes a
   `web.js` that overwrites this module's glue of the same name.

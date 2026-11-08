@@ -4,8 +4,14 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -34,40 +40,61 @@ func TestWebrefSpecsWellFormed(t *testing.T) {
 	}
 }
 
-// The pin is what makes a binding diff traceable to a spec revision, so both
-// halves of it must be present and plausible.
-func TestWebrefPin(t *testing.T) {
-	if WebrefVersion == "" {
-		t.Error("WebrefVersion is empty")
-	}
-	if len(WebrefSHA256) != 64 {
-		t.Errorf("WebrefSHA256 = %q (%d chars), want a 64-char hex sha256",
-			WebrefSHA256, len(WebrefSHA256))
-	}
-	for _, r := range WebrefSHA256 {
-		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f')) {
-			t.Errorf("WebrefSHA256 contains non-lowercase-hex %q", r)
-			break
-		}
+// pinnedInputs are the inputs every pinned-input test runs over: each one
+// fetches and goes stale the same way, so each must pass the same tests.
+func pinnedInputs() []PinnedInput { return []PinnedInput{IDLInput(), BaselineInput()} }
+
+// A pin is what makes a binding diff traceable to an input revision, so both
+// halves of every pin must be present and plausible.
+func TestPinsArePlausible(t *testing.T) {
+	for _, p := range pinnedInputs() {
+		t.Run(p.Package, func(t *testing.T) {
+			if p.Version == "" {
+				t.Error("no version")
+			}
+			if len(p.SHA256) != 64 {
+				t.Errorf("sha256 = %q (%d chars), want a 64-char hex sha256", p.SHA256, len(p.SHA256))
+			}
+			if strings.Trim(p.SHA256, "0") == "" {
+				t.Error("sha256 is all zeros: a placeholder, not a pin")
+			}
+			for _, r := range p.SHA256 {
+				if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f')) {
+					t.Errorf("sha256 contains non-lowercase-hex %q", r)
+					break
+				}
+			}
+			if !strings.Contains(p.Tarball, p.Version) {
+				t.Errorf("tarball %s does not name the pinned version %s", p.Tarball, p.Version)
+			}
+			if len(p.Members) == 0 {
+				t.Error("no members: the input would extract nothing")
+			}
+		})
 	}
 }
 
-func TestIDLPaths(t *testing.T) {
-	paths := IDLPaths("/repo")
+func TestPinnedInputPaths(t *testing.T) {
+	idl := IDLInput()
+	paths := idl.Paths("/repo")
 	if len(paths) != len(WebrefSpecs) {
 		t.Fatalf("got %d paths, want %d", len(paths), len(WebrefSpecs))
 	}
-	want := filepath.Join("/repo", IDLDir, WebrefSpecs[0].Stem+".idl")
-	if paths[0] != want {
+	if want := filepath.Join("/repo", IDLDir, WebrefSpecs[0].Stem+".idl"); paths[0] != want {
 		t.Errorf("paths[0] = %q, want %q", paths[0], want)
+	}
+
+	if got, want := BaselineInput().Paths("/repo"), []string{filepath.Join("/repo", BaselineDir, BaselineData)}; len(got) != 1 || got[0] != want[0] {
+		t.Errorf("Baseline paths = %v, want %v", got, want)
 	}
 }
 
-// IDLFresh gates the network call, so each way of being stale matters.
-func TestIDLFresh(t *testing.T) {
-	writeIDL := func(root, version string, stems []string) {
+// Fresh gates the network call, so each way of being stale matters, for
+// every input.
+func TestPinnedInputFresh(t *testing.T) {
+	write := func(t *testing.T, p PinnedInput, root, version string, members []string) {
 		t.Helper()
-		dir := filepath.Join(root, IDLDir)
+		dir := filepath.Join(root, p.Dir)
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -76,55 +103,128 @@ func TestIDLFresh(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		for _, s := range stems {
-			if err := os.WriteFile(filepath.Join(dir, s+".idl"), []byte("// idl\n"), 0o644); err != nil {
+		for _, m := range members {
+			if err := os.WriteFile(filepath.Join(dir, m), []byte("input\n"), 0o644); err != nil {
 				t.Fatal(err)
 			}
 		}
 	}
 
-	allStems := make([]string, 0, len(WebrefSpecs))
-	for _, s := range WebrefSpecs {
-		allStems = append(allStems, s.Stem)
+	for _, p := range pinnedInputs() {
+		t.Run(p.Package, func(t *testing.T) {
+			t.Run("no directory", func(t *testing.T) {
+				if p.Fresh(t.TempDir()) {
+					t.Errorf("fresh with no %s/ at all", p.Dir)
+				}
+			})
+
+			t.Run("complete and pinned", func(t *testing.T) {
+				root := t.TempDir()
+				write(t, p, root, p.Version, p.Members)
+				if !p.Fresh(root) {
+					t.Errorf("stale despite a complete %s/ at the pinned version", p.Dir)
+				}
+			})
+
+			t.Run("version mismatch", func(t *testing.T) {
+				root := t.TempDir()
+				write(t, p, root, "0.0.1-not-the-pin", p.Members)
+				if p.Fresh(root) {
+					t.Error("fresh despite a VERSION that does not match the pin")
+				}
+			})
+
+			t.Run("missing VERSION", func(t *testing.T) {
+				root := t.TempDir()
+				write(t, p, root, "", p.Members)
+				if p.Fresh(root) {
+					t.Error("fresh despite no VERSION stamp")
+				}
+			})
+
+			t.Run("missing a member", func(t *testing.T) {
+				root := t.TempDir()
+				write(t, p, root, p.Version, p.Members[:len(p.Members)-1])
+				if p.Fresh(root) {
+					t.Error("fresh despite a member missing")
+				}
+			})
+		})
 	}
+}
 
-	t.Run("no idl dir", func(t *testing.T) {
-		if IDLFresh(t.TempDir()) {
-			t.Error("fresh with no idl/ at all")
+// servedInput is an input whose tarball a local server serves, pinned to the
+// sha256 given.
+func servedInput(t *testing.T, tarball []byte, pin string) PinnedInput {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if _, err := w.Write(tarball); err != nil {
+			t.Error(err)
 		}
-	})
+	}))
+	t.Cleanup(srv.Close)
+	return PinnedInput{
+		Package: "probe",
+		Version: "1.0.0",
+		SHA256:  pin,
+		Tarball: srv.URL + "/probe-1.0.0.tgz",
+		Dir:     "probe",
+		Members: []string{"data.json"},
+	}
+}
 
-	t.Run("complete and pinned", func(t *testing.T) {
-		root := t.TempDir()
-		writeIDL(root, WebrefVersion, allStems)
-		if !IDLFresh(root) {
-			t.Error("stale despite a complete idl/ at the pinned version")
-		}
-	})
+func sha256Hex(b []byte) string {
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])
+}
 
-	t.Run("version mismatch", func(t *testing.T) {
-		root := t.TempDir()
-		writeIDL(root, "0.0.1-not-the-pin", allStems)
-		if IDLFresh(root) {
-			t.Error("fresh despite a VERSION that does not match the pin")
-		}
-	})
+// A tarball that does not hash to its pin is refused before anything is
+// extracted, so a changed release never regenerates the bindings silently.
+func TestFetchRefusesATarballThatDoesNotMatchItsPin(t *testing.T) {
+	tarball := buildTarball(t, map[string]string{"package/data.json": "{}"})
+	p := servedInput(t, tarball, strings.Repeat("ab", 32))
+	root := t.TempDir()
 
-	t.Run("missing VERSION", func(t *testing.T) {
-		root := t.TempDir()
-		writeIDL(root, "", allStems)
-		if IDLFresh(root) {
-			t.Error("fresh despite no VERSION stamp")
-		}
-	})
+	err := p.Fetch(root, io.Discard)
+	if err == nil {
+		t.Fatal("fetched a tarball whose sha256 is not the pin")
+	}
+	if !strings.Contains(err.Error(), sha256Hex(tarball)) {
+		t.Errorf("the refusal does not name the sha256 it got: %v", err)
+	}
+	if Exists(filepath.Join(root, p.Dir)) {
+		t.Error("a refused fetch wrote the input directory")
+	}
+}
 
-	t.Run("missing a spec", func(t *testing.T) {
-		root := t.TempDir()
-		writeIDL(root, WebrefVersion, allStems[:len(allStems)-1])
-		if IDLFresh(root) {
-			t.Error("fresh despite a spec file missing")
-		}
+func TestFetchExtractsAndStampsAMatchingTarball(t *testing.T) {
+	tarball := buildTarball(t, map[string]string{
+		"package/data.json": `{"features":{}}`,
+		"package/other.js":  "not wanted",
 	})
+	p := servedInput(t, tarball, sha256Hex(tarball))
+	root := t.TempDir()
+
+	if err := p.Fetch(root, io.Discard); err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if !p.Fresh(root) {
+		t.Error("stale right after a fetch")
+	}
+	if Exists(filepath.Join(root, p.Dir, "other.js")) {
+		t.Error("extracted a file that is not a member")
+	}
+}
+
+// A member the release does not carry is a missing input, never a short one.
+func TestFetchReportsAMissingMember(t *testing.T) {
+	tarball := buildTarball(t, map[string]string{"package/README.md": "no data"})
+	p := servedInput(t, tarball, sha256Hex(tarball))
+
+	err := p.Fetch(t.TempDir(), io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "data.json") {
+		t.Fatalf("Fetch = %v, want a refusal naming the missing data.json", err)
+	}
 }
 
 func TestExtract(t *testing.T) {
@@ -137,15 +237,15 @@ func TestExtract(t *testing.T) {
 
 	dst := t.TempDir()
 	found, err := extract(tarball, map[string]string{
-		"package/dom.idl":     "dom",
-		"package/console.idl": "console",
+		"package/dom.idl":     "dom.idl",
+		"package/console.idl": "console.idl",
 	}, dst)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
 
-	if len(found) != 2 || !found["dom"] || !found["console"] {
-		t.Errorf("found = %v, want dom and console", found)
+	if len(found) != 2 || !found["dom.idl"] || !found["console.idl"] {
+		t.Errorf("found = %v, want dom.idl and console.idl", found)
 	}
 
 	got, err := os.ReadFile(filepath.Join(dst, "dom.idl"))
@@ -157,7 +257,7 @@ func TestExtract(t *testing.T) {
 	}
 
 	// Members outside the wanted set must not be written: the fetch is scoped
-	// to the spec list, not "whatever the tarball happens to contain".
+	// to the pinned members, not "whatever the tarball happens to contain".
 	if Exists(filepath.Join(dst, "ignored.idl")) {
 		t.Error("extract wrote a file that was not requested")
 	}
@@ -169,17 +269,17 @@ func TestExtractReportsMissing(t *testing.T) {
 	tarball := buildTarball(t, map[string]string{"package/dom.idl": "interface Node {};"})
 
 	found, err := extract(tarball, map[string]string{
-		"package/dom.idl":  "dom",
-		"package/gone.idl": "gone",
+		"package/dom.idl":  "dom.idl",
+		"package/gone.idl": "gone.idl",
 	}, t.TempDir())
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
-	if found["gone"] {
+	if found["gone.idl"] {
 		t.Error("reported a member the tarball does not contain")
 	}
 	if len(found) != 1 {
-		t.Errorf("found = %v, want just dom", found)
+		t.Errorf("found = %v, want just dom.idl", found)
 	}
 }
 

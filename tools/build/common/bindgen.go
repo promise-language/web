@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/promise-language/forge/primitives"
+	"github.com/promise-language/forge/primitives/tooling"
 )
 
 // GeneratedFiles are the artifacts `promise bind webidl` produces that this
@@ -23,7 +23,7 @@ var GeneratedFiles = []string{"web.pr", "web.js"}
 
 // BindgenInput is what bin/bindgen takes: every flag is a field.
 type BindgenInput struct {
-	Force bool `flag:"force" help:"re-fetch idl/ even when it is already at the pinned version"`
+	Force bool `flag:"force" help:"re-fetch idl/ and baseline/ even when they are already at the pinned versions"`
 	Clean bool `flag:"clean" help:"remove idl/ once generation succeeds"`
 }
 
@@ -57,23 +57,37 @@ func (b Bindings) Human(w io.Writer) error {
 	return err
 }
 
-// RunBindgen regenerates web.pr and web.js from the pinned WebIDL definitions.
+// RunBindgen regenerates web.pr and web.js from the pinned WebIDL definitions,
+// reduced to the keep list.
 //
 // It is the whole binding pipeline in one command:
 //
-//	idl/ (fetched, pinned)  ->  promise bind webidl  ->  web.pr + web.js
+//	idl/ + baseline/ (fetched, pinned)  ->  keep list checked against Baseline
+//	  ->  promise bind webidl -keep web.keep  ->  web.pr + web.js
 //
-// Progress, and the compiler's own output, go to narrate; the result is what
-// was installed.
+// The compiler is the one this project pins (project.go), resolved from the
+// checkout's dependency record and never from PATH, so a regeneration depends
+// on nothing outside the tree's pins.
+//
+// Progress, and the compiler's own output — including each member `-keep`
+// reports dropping — go to narrate; the result is what was installed.
 func RunBindgen(ctx context.Context, repoRoot string, in BindgenInput, narrate io.Writer) (Bindings, error) {
-	promise, err := findPromise()
+	compiler, err := tooling.Resolve(repoRoot, promise, tooling.HostTarget())
 	if err != nil {
 		return Bindings{}, err
 	}
 
-	fmt.Fprintln(narrate, "==> WebIDL inputs")
-	if err := EnsureIDL(repoRoot, in.Force, narrate); err != nil {
-		return Bindings{}, err
+	fmt.Fprintln(narrate, "==> pinned inputs")
+	baseline := BaselineInput()
+	for _, input := range []PinnedInput{IDLInput(), baseline} {
+		if err := input.Ensure(repoRoot, in.Force, narrate); err != nil {
+			return Bindings{}, err
+		}
+	}
+
+	fmt.Fprintln(narrate, "==> keep list against Baseline")
+	if err := CheckKeepList(filepath.Join(repoRoot, KeepList), baseline.Paths(repoRoot)[0]); err != nil {
+		return Bindings{}, fmt.Errorf("%s selects what web-features@%s does not report Baseline:\n%w", KeepList, WebFeaturesVersion, err)
 	}
 
 	// Generate into a scratch directory: `bind` also emits a promise.toml, and
@@ -91,13 +105,7 @@ func RunBindgen(ctx context.Context, repoRoot string, in BindgenInput, narrate i
 	defer os.RemoveAll(stage)
 
 	fmt.Fprintln(narrate, "==> promise bind webidl")
-	// -name web is required: without it the module is named after the first
-	// interface, and "web" specifically is treated as unset and falls back to
-	// the input filename.
-	bindArgs := []string{"bind", "webidl", "-name", "web", "-o", stage}
-	bindArgs = append(bindArgs, IDLPaths(repoRoot)...)
-
-	cmd := exec.CommandContext(ctx, promise, bindArgs...)
+	cmd := exec.CommandContext(ctx, compiler, bindArgs(repoRoot, stage)...)
 	cmd.Dir = repoRoot
 	cmd.Stdout = narrate
 	cmd.Stderr = narrate
@@ -143,21 +151,12 @@ func copyFile(src, dst string) (int, error) {
 	return len(data), nil
 }
 
-// findPromise locates the Promise toolchain: PATH first, then the default root
-// that `promise install` writes to.
-func findPromise() (string, error) {
-	if p := Which("promise"); p != "" {
-		return p, nil
-	}
-
-	if home, err := os.UserHomeDir(); err == nil {
-		fallback := filepath.Join(home, ".promise", "bin", primitives.BinaryName("promise"))
-		if Exists(fallback) {
-			return fallback, nil
-		}
-	}
-
-	return "", fmt.Errorf("the promise compiler is not installed or not on PATH\n" +
-		"install it from https://github.com/promise-language/promise, " +
-		"or add ~/.promise/bin to PATH")
+// bindArgs is the one `promise bind webidl` invocation: every pinned spec, in
+// WebrefSpecs order, reduced to the keep list and written into stage.
+//
+// -name web is required: without it the module is named after the first input
+// file.
+func bindArgs(repoRoot, stage string) []string {
+	args := []string{"bind", "webidl", "-name", "web", "-keep", filepath.Join(repoRoot, KeepList), "-o", stage}
+	return append(args, IDLInput().Paths(repoRoot)...)
 }
